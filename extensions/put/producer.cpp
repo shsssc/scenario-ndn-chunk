@@ -81,7 +81,6 @@ Producer::run()
 void
 Producer::processDiscoveryInterest(const Interest& interest)
 {
-    std::cerr <<"debug line 84" <<std::endl;
   if (m_options.isVerbose)
     std::cerr << "Discovery Interest: " << interest << std::endl;
 
@@ -100,16 +99,13 @@ Producer::processDiscoveryInterest(const Interest& interest)
 
   if (m_options.isVerbose)
     std::cerr << "Sending metadata: " << mdata << std::endl;
-    std::cerr <<"debug line 103" <<std::endl;
   m_face.put(mdata);
 }
 
 void
 Producer::processSegmentInterest(const Interest& interest)
 {
-    std::cerr <<"debug line 110" <<std::endl;
   BOOST_ASSERT(m_store.size() > 0);
-  std::cerr <<"interest received!!!" <<std::endl;
   if (m_options.isVerbose)
     std::cerr << "Interest: " << interest << std::endl;
 

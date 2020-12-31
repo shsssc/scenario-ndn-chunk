@@ -67,10 +67,8 @@ DiscoverVersion::run()
 void
 DiscoverVersion::handleData(const Interest& interest, const Data& data)
 {
-    for (int i=0;i<10;i++){
-        std::cout<<i <<std::endl;
-    }
-  //if (m_options.isVerbose)
+
+  if (m_options.isVerbose)
     std::cerr << "Data: " << data << std::endl;
 
   // make a metadata object from received metadata packet
@@ -88,12 +86,10 @@ DiscoverVersion::handleData(const Interest& interest, const Data& data)
     return;
   }
 
- // if (m_options.isVerbose) {
-    std::cerr << "Discovered Data version: " << mobject.getVersionedName()[-1] << std::endl;
-  //}
-  std::cerr << "aaaaaaaaonDiscoverySuccess" <<std::endl;
+ if (m_options.isVerbose) {
+     std::cerr << "Discovered Data version: " << mobject.getVersionedName()[-1] << std::endl;
+ }
   onDiscoverySuccess(mobject.getVersionedName());
-  std::cerr << "onDiscoverySuccess" <<std::endl;
 }
 
 } // namespace chunks

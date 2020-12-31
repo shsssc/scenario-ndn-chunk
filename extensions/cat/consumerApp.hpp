@@ -32,6 +32,8 @@
 #include "discover-version.hpp"
 #include "pipeline-interests-aimd.hpp"
 #include "pipeline-interests-cubic.hpp"
+#include "boost/iostreams/stream.hpp"
+#include "boost/iostreams/device/null.hpp"
 //#include "pipeline-interests-fixed.hpp"
 //#include "statistics-collector.hpp"
 
@@ -40,7 +42,7 @@ namespace ndn {
 
         class consumerApp {
         public:
-            consumerApp(std::string uri) {
+            explicit consumerApp(const std::string& uri) :nullOstream(( boost::iostreams::null_sink() ) ) {
                 this->uri = uri;
                 discover = make_unique<DiscoverVersion>(m_face, Name(uri), options);
                 optionsRttEst = make_shared<RttEstimatorWithStats::Options>();
@@ -58,7 +60,7 @@ namespace ndn {
                 } else {
                     adaptivePipeline = make_unique<PipelineInterestsCubic>(m_face, *rttEstimator, options);
                 }
-                consumer = make_unique<Consumer>();
+                consumer = make_unique<Consumer>(nullOstream);
             }
 
             void run() {
@@ -82,6 +84,7 @@ namespace ndn {
             double rtoBeta = 0.25;
             int rtoK = 8;
             Options options;
+            boost::iostreams::stream< boost::iostreams::null_sink > nullOstream;
         };
 
     } // namespace chunks

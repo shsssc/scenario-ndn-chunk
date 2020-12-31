@@ -55,6 +55,7 @@ def configure(conf):
     if conf.options.debug:
         conf.define ('NS3_LOG_ENABLE', 1)
         conf.define ('NS3_ASSERT_ENABLE', 1)
+        print ("!!!!")
 
     if conf.env.DEST_BINFMT == 'elf':
         # All ELF platforms are impacted but only the gcc compiler has a flag to fix it.
@@ -75,7 +76,7 @@ def build (bld):
         features = ["cxx"],
         source = bld.path.ant_glob(['extensions/**/*.cc', 'extensions/**/*.cpp']),
         use = deps,
-        cxxflags     = ['-O0', '-fsanitize=address'],
+        #cxxflags     = ['-O3', '-fsanitize=address'],
         )
 
     for scenario in bld.path.ant_glob(['scenarios/*.cc', 'scenarios/*.cpp']):
@@ -86,8 +87,8 @@ def build (bld):
             source = [scenario],
             use = deps + " extensions",
             includes = "extensions",
-            cxxflags     = ['-O0', '-fsanitize=address'],
-            ldflags     = [ '-fsanitize=address'],
+            #cxxflags     = ['-O3', '-fsanitize=address'],
+            #ldflags     = [ '-fsanitize=address'],
             )
 
 def shutdown (ctx):
