@@ -6,3 +6,5 @@
 .lock*
 build/
 *.pyc
+.idea
+cmake-build-debug/

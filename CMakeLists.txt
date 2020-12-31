@@ -7,6 +7,7 @@ include_directories(extensions)
 include_directories(extensions/cat)
 include_directories(extensions/put)
 include_directories(/usr/local/include/ns3-dev/)
+include_directories(/usr/local/include/ns3-dev/ns3/ndnSIM/)
 
 add_executable(extensions
         extensions/cat/catChunks.cpp
@@ -37,4 +38,5 @@ add_executable(extensions
         extensions/put/producer.hpp
         extensions/put/putChunks.cpp
         extensions/put/putChunks.hpp
+        scenarios/ndn-simple.cpp
         )
