@@ -62,7 +62,7 @@ public:
    * @param prefix prefix used to publish data; if the last component is not a valid
    *               version number, the current system time is used as version number.
    */
-  Producer(const Name& prefix, KeyChain& keyChain, std::istream& is,
+  Producer(const Name& prefix, KeyChain& keyChain, unsigned long long is,
            const Options& opts);
 
   /**
@@ -83,7 +83,7 @@ private:
    * @return Number of data packets contained in the store after the operation
    */
   void
-  populateStore(std::istream& is);
+  populateStore(unsigned long long is);
 
   /**
    * @brief Respond with a metadata packet containing the versioned content name
@@ -100,15 +100,20 @@ private:
   void
   onRegisterFailed(const Name& prefix, const std::string& reason);
 
+  shared_ptr<Data>
+  genData(int segment);
 PUBLIC_WITH_TESTS_ELSE_PRIVATE:
   std::vector<shared_ptr<Data>> m_store;
 
+
 private:
+  uint32_t m_storeSize;
   Name m_prefix;
   Name m_versionedPrefix;
   Face m_face;
   KeyChain& m_keyChain;
   const Options m_options;
+  uint64_t m_data_sz;
 };
 
 } // namespace chunks

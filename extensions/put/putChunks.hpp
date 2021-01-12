@@ -23,7 +23,7 @@ public:
     .AddAttribute("Prefix", "Prefix", StringValue("/"),
             MakeNameAccessor(&PutChunks::m_prefix), MakeNameChecker())
       .AddAttribute("size", "Size of file to send", IntegerValue(1),
-                    MakeIntegerAccessor(&PutChunks::m_sz), MakeIntegerChecker<int32_t>());
+                    MakeIntegerAccessor(&PutChunks::m_sz), MakeIntegerChecker<int64_t>());
 
     return tid;
   }
@@ -33,10 +33,10 @@ protected:
   virtual void
   StartApplication()
   {
-    std::string s(m_sz,'a');
-    std::istrstream ss(s.c_str());
+    //std::string s(m_sz,'a');
+    //std::istrstream ss(s.c_str());
     // Create an instance of the app, and passing the dummy version of KeyChain (no real signing)
-    m_instance.reset(new chunks::Producer(m_prefix, ndn::StackHelper::getKeyChain(),ss, opts));
+    m_instance.reset(new chunks::Producer(m_prefix, ndn::StackHelper::getKeyChain(),m_sz, opts));
     m_instance->run(); // can be omitted
   }
 
@@ -50,7 +50,7 @@ protected:
 private:
   std::unique_ptr<chunks::Producer> m_instance;
   Name m_prefix;
-  uint32_t m_sz;
+  int64_t m_sz;
   chunks::Producer::Options opts;
 };
 }

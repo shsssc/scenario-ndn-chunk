@@ -35,7 +35,7 @@
 namespace ndn {
 namespace chunks {
 
-Producer::Producer(const Name& prefix, KeyChain& keyChain, std::istream& is,
+Producer::Producer(const Name& prefix, KeyChain& keyChain, unsigned long long is,
                    const Options& opts)
   : m_keyChain(keyChain)
   , m_options(opts)
@@ -49,7 +49,9 @@ Producer::Producer(const Name& prefix, KeyChain& keyChain, std::istream& is,
     m_versionedPrefix = Name(m_prefix).appendVersion();
   }
 
-  populateStore(is);
+  //populateStore(is);
+  m_storeSize = is/m_options.maxSegmentSize + (is%m_options.maxSegmentSize != 0);
+  m_data_sz = is;
 
   if (m_options.wantShowVersion)
     std::cout << m_versionedPrefix[-1] << std::endl;
@@ -105,7 +107,7 @@ Producer::processDiscoveryInterest(const Interest& interest)
 void
 Producer::processSegmentInterest(const Interest& interest)
 {
-  BOOST_ASSERT(m_store.size() > 0);
+  //BOOST_ASSERT(m_store.size() > 0);
   if (m_options.isVerbose)
     std::cerr << "Interest: " << interest << std::endl;
 
@@ -115,13 +117,13 @@ Producer::processSegmentInterest(const Interest& interest)
   if (name.size() == m_versionedPrefix.size() + 1 && name[-1].isSegment()) {
     const auto segmentNo = static_cast<size_t>(interest.getName()[-1].toSegment());
     // specific segment retrieval
-    if (segmentNo < m_store.size()) {
-      data = m_store[segmentNo];
+    if (segmentNo < m_storeSize) {
+      data = genData(segmentNo);
     }
   }
-  else if (interest.matchesData(*m_store[0])) {
+  else if (interest.matchesData(*genData(0))) {
     // unspecified version or segment number, return first segment
-    data = m_store[0];
+    data = genData(0);
   }
 
   if (data != nullptr) {
@@ -138,17 +140,23 @@ Producer::processSegmentInterest(const Interest& interest)
 }
 
 void
-Producer::populateStore(std::istream& is)
+Producer::populateStore(unsigned long long is)
 {
   BOOST_ASSERT(m_store.empty());
 
   if (!m_options.isQuiet)
     std::cerr << "Loading input ..." << std::endl;
 
-  std::vector<uint8_t> buffer(m_options.maxSegmentSize);
-  while (is.good()) {
-    is.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
-    const auto nCharsRead = is.gcount();
+  //std::vector<uint8_t> buffer(m_options.maxSegmentSize);
+
+  //newly added this to simulate data
+  m_storeSize = is/m_options.maxSegmentSize + (is%m_options.maxSegmentSize != 0);
+
+  /*
+  while (is!=0) {
+    //is.read(reinterpret_cast<char*>(buffer.data()), buffer.size());
+    const auto nCharsRead = is>buffer.size()?buffer.size():is; //is.gcount();
+    is -= nCharsRead;
 
     if (nCharsRead > 0) {
       auto data = make_shared<Data>(Name(m_versionedPrefix).appendSegment(m_store.size()));
@@ -158,17 +166,21 @@ Producer::populateStore(std::istream& is)
     }
   }
 
+
   if (m_store.empty()) {
     auto data = make_shared<Data>(Name(m_versionedPrefix).appendSegment(0));
     data->setFreshnessPeriod(m_options.freshnessPeriod);
     m_store.push_back(data);
   }
+  */
 
-  auto finalBlockId = name::Component::fromSegment(m_store.size() - 1);
+  /*
+  auto finalBlockId = name::Component::fromSegment(m_storeSize - 1);
   for (const auto& data : m_store) {
     data->setFinalBlock(finalBlockId);
     m_keyChain.sign(*data, m_options.signingInfo);
   }
+  */
 
   if (!m_options.isQuiet)
     std::cerr << "Created " << m_store.size() << " chunks for prefix " << m_prefix << std::endl;
@@ -180,6 +192,21 @@ Producer::onRegisterFailed(const Name& prefix, const std::string& reason)
   std::cerr << "ERROR: Failed to register prefix '"
             << prefix << "' (" << reason << ")" << std::endl;
   m_face.shutdown();
+}
+
+shared_ptr<Data> Producer::genData(int segment) {
+  auto data = make_shared<Data>(Name(m_versionedPrefix).appendSegment(segment));
+  data->setFreshnessPeriod(m_options.freshnessPeriod);
+  auto finalBlockId = name::Component::fromSegment(m_storeSize - 1);
+  data->setFinalBlock(finalBlockId);
+  std::vector<uint8_t> buffer(m_options.maxSegmentSize);
+  int sz = m_options.maxSegmentSize;
+  if (segment == m_storeSize-1 && m_data_sz%sz != 0){
+    sz = m_data_sz%sz;
+  }
+  data->setContent(buffer.data(), static_cast<size_t>(sz));
+  m_keyChain.sign(*data, m_options.signingInfo);
+  return data;
 }
 
 } // namespace chunks
