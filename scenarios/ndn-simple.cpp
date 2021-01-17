@@ -47,12 +47,11 @@ namespace ns3 {
  */
 
 int
-main(int argc, char* argv[])
-{
+main(int argc, char *argv[]) {
   // setting default parameters for PointToPoint links and channels
   Config::SetDefault("ns3::PointToPointNetDevice::DataRate", StringValue("1Gbps"));
   Config::SetDefault("ns3::PointToPointChannel::Delay", StringValue("30ms"));
-  Config::SetDefault("ns3::QueueBase::MaxSize", StringValue("10000p"));
+  Config::SetDefault("ns3::QueueBase::MaxSize", StringValue("1000p"));
 
   // Read optional command-line parameters (e.g., enable visualizer with ./waf --run=<> --visualize
   CommandLine cmd;
@@ -80,20 +79,20 @@ main(int argc, char* argv[])
   // Consumer
   ndn::AppHelper consumerHelper("NetBLT");
   // Consumer will request /prefix/0, /prefix/1, ...
-    consumerHelper.SetAttribute("Prefix", StringValue("/ping"));
+  consumerHelper.SetAttribute("Prefix", StringValue("/ping"));
   auto apps = consumerHelper.Install(nodes.Get(0));                        // first node
   apps.Start(Seconds(1.0));
-  apps.Stop(Seconds(2000.0)); // stop the consumer app at 10 seconds mark
+  apps.Stop(Seconds(30.0)); // stop the consumer app at 10 seconds mark
 
   // Producer
   ndn::AppHelper producerHelper("PutChunks");
   // Producer will reply to all requests starting with /prefix
   producerHelper.SetAttribute("Prefix", StringValue("/ping"));
-  producerHelper.SetAttribute("size", StringValue("2000000000"));
+  producerHelper.SetAttribute("size", StringValue("200000000"));
   producerHelper.Install(nodes.Get(2)); // last node
 
-  Simulator::Stop(Seconds(2000.0));
-
+  Simulator::Stop(Seconds(30.0));
+  ndn::L3RateTracer::InstallAll("rate-trace.txt", Seconds(0.5));
   Simulator::Run();
   Simulator::Destroy();
 
@@ -103,7 +102,6 @@ main(int argc, char* argv[])
 } // namespace ns3
 
 int
-main(int argc, char* argv[])
-{
+main(int argc, char *argv[]) {
   return ns3::main(argc, argv);
 }

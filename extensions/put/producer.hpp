@@ -52,7 +52,7 @@ public:
     size_t maxSegmentSize = MAX_NDN_PACKET_SIZE >> 1;
     bool isQuiet = false;
     bool isVerbose = false;
-    bool wantShowVersion = true;
+    bool wantShowVersion = false;
   };
 
 public:
