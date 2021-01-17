@@ -40,7 +40,7 @@ struct Options
   bool disableVersionDiscovery = false;
   bool mustBeFresh = false;
   bool isQuiet = false;
-  bool isVerbose = true;
+  bool isVerbose = false;
 
   // Fixed pipeline options
   size_t maxPipelineSize = 1;

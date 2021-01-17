@@ -50,9 +50,9 @@ int
 main(int argc, char* argv[])
 {
   // setting default parameters for PointToPoint links and channels
-  Config::SetDefault("ns3::PointToPointNetDevice::DataRate", StringValue("10Gbps"));
+  Config::SetDefault("ns3::PointToPointNetDevice::DataRate", StringValue("1Gbps"));
   Config::SetDefault("ns3::PointToPointChannel::Delay", StringValue("30ms"));
-  Config::SetDefault("ns3::QueueBase::MaxSize", StringValue("100p"));
+  Config::SetDefault("ns3::QueueBase::MaxSize", StringValue("10000p"));
 
   // Read optional command-line parameters (e.g., enable visualizer with ./waf --run=<> --visualize
   CommandLine cmd;
@@ -78,7 +78,7 @@ main(int argc, char* argv[])
   // Installing applications
 
   // Consumer
-  ndn::AppHelper consumerHelper("CatChunks");
+  ndn::AppHelper consumerHelper("NetBLT");
   // Consumer will request /prefix/0, /prefix/1, ...
     consumerHelper.SetAttribute("Prefix", StringValue("/ping"));
   auto apps = consumerHelper.Install(nodes.Get(0));                        // first node
