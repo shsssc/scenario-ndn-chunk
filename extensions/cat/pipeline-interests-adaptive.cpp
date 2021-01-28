@@ -254,7 +254,7 @@ PipelineInterestsAdaptive::handleData(const Interest& interest, const Data& data
 
   // upon finding congestion mark, decrease the window size
   // without retransmitting any packet
-  if (data.getCongestionMark() > 0) {
+  if (data.getCongestionMark() > 0 ) {
     m_nCongMarks++;
     if (!m_options.ignoreCongMarks) {
       if (m_options.disableCwa || m_highData > m_recPoint) {

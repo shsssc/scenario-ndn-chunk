@@ -8,3 +8,5 @@ build/
 *.pyc
 .idea
 cmake-build-debug/
+rate-trace.txt
+

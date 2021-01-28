@@ -75,6 +75,10 @@ def build (bld):
         features = ["cxx"],
         source = bld.path.ant_glob(['extensions/**/*.cc', 'extensions/**/*.cpp']),
         use = deps,
+        cxxflags = ['-fsanitize=leak'],
+        ldflags = ['-fsanitize=leak']
+        #cxxflags = ['-O4','-pg','-g'],
+        #ldflags = ['-pg'],
         )
 
     for scenario in bld.path.ant_glob(['scenarios/*.cc', 'scenarios/*.cpp']):
@@ -84,7 +88,11 @@ def build (bld):
             features = ['cxx'],
             source = [scenario],
             use = deps + " extensions",
-            includes = "extensions"
+            includes = "extensions",
+            cxxflags = ['-fsanitize=leak'],
+            ldflags = ['-fsanitize=leak']
+            #cxxflags     = ['-O4','-pg','-g'],
+            #ldflags = ['-pg'],
             )
 
 def shutdown (ctx):
