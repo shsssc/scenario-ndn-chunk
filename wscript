@@ -75,8 +75,8 @@ def build (bld):
         features = ["cxx"],
         source = bld.path.ant_glob(['extensions/**/*.cc', 'extensions/**/*.cpp']),
         use = deps,
-        cxxflags = ['-fsanitize=leak'],
-        ldflags = ['-fsanitize=leak']
+        #cxxflags = ['-fsanitize=address'],
+        #ldflags = ['-fsanitize=address']
         #cxxflags = ['-O4','-pg','-g'],
         #ldflags = ['-pg'],
         )
@@ -89,8 +89,8 @@ def build (bld):
             source = [scenario],
             use = deps + " extensions",
             includes = "extensions",
-            cxxflags = ['-fsanitize=leak'],
-            ldflags = ['-fsanitize=leak']
+            #cxxflags = ['-fsanitize=address'],
+            #ldflags = ['-fsanitize=address']
             #cxxflags     = ['-O4','-pg','-g'],
             #ldflags = ['-pg'],
             )

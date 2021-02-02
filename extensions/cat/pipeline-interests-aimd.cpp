@@ -33,35 +33,30 @@
 namespace ndn {
 namespace chunks {
 
-PipelineInterestsAimd::PipelineInterestsAimd(Face& face, RttEstimatorWithStats& rttEstimator,
-                                             const Options& opts)
-  : PipelineInterestsAdaptive(face, rttEstimator, opts)
-{
+PipelineInterestsAimd::PipelineInterestsAimd(Face &face, RttEstimatorWithStats &rttEstimator,
+                                             const Options &opts)
+   : PipelineInterestsAdaptive(face, rttEstimator, opts) {
   if (m_options.isVerbose) {
     printOptions();
   }
 }
 
 void
-PipelineInterestsAimd::increaseWindow()
-{
+PipelineInterestsAimd::increaseWindow() {
   if (m_cwnd < m_ssthresh) {
     m_cwnd += m_options.aiStep; // additive increase
-  }
-  else {
+  } else {
     m_cwnd += m_options.aiStep / std::floor(m_cwnd); // congestion avoidance
   }
-
   emitSignal(afterCwndChange, time::steady_clock::now() - getStartTime(), m_cwnd);
 }
 
 void
-PipelineInterestsAimd::decreaseWindow()
-{
+PipelineInterestsAimd::decreaseWindow() {
   // please refer to RFC 5681, Section 3.1 for the rationale behind it
   m_ssthresh = std::max(MIN_SSTHRESH, m_cwnd * m_options.mdCoef); // multiplicative decrease
   m_cwnd = m_options.resetCwndToInit ? m_options.initCwnd : m_ssthresh;
-
+  std::cout << "window reduction at" << time::steady_clock::now() - getStartTime()<< std::endl;
   emitSignal(afterCwndChange, time::steady_clock::now() - getStartTime(), m_cwnd);
 }
 

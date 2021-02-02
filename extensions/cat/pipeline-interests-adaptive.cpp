@@ -105,6 +105,7 @@ PipelineInterestsAdaptive::checkRto()
       if (timeElapsed > segInfo.rto) { // timer expired?
         m_nTimeouts++;
         hasTimeout = true;
+        std::cout << "timeout" <<entry.first<<std::endl;
         enqueueForRetransmission(entry.first);
       }
     }
@@ -160,7 +161,7 @@ PipelineInterestsAdaptive::sendInterest(uint64_t segNo, bool isRetransmission)
                   .setCanBePrefix(false)
                   .setMustBeFresh(m_options.mustBeFresh)
                   .setInterestLifetime(m_options.interestLifetime);
-
+  std::cout << "express interest with seg" << segNo<< " rto: "<<m_rttEstimator.getEstimatedRto().count()/1000000 <<std::endl;
   SegmentInfo& segInfo = m_segmentInfo[segNo];
   segInfo.interestHdl = m_face.expressInterest(interest,
                                                bind(&PipelineInterestsAdaptive::handleData, this, _1, _2),
@@ -211,7 +212,7 @@ PipelineInterestsAdaptive::handleData(const Interest& interest, const Data& data
 {
   if (isStopping())
     return;
-
+  //std::cout << "inflight" <<m_nInFlight << "window" << m_cwnd <<"rto"<<m_rttEstimator.getSmoothedRtt() <<std::endl;
   // Interest was expressed with CanBePrefix=false
   BOOST_ASSERT(data.getName().equals(interest.getName()));
 
@@ -229,6 +230,7 @@ PipelineInterestsAdaptive::handleData(const Interest& interest, const Data& data
   }
 
   uint64_t recvSegNo = getSegmentFromPacket(data);
+  std::cout << "ack" <<recvSegNo<<std::endl;
   auto segIt = m_segmentInfo.find(recvSegNo);
   if (segIt == m_segmentInfo.end()) {
     return; // ignore already-received segment
@@ -254,13 +256,14 @@ PipelineInterestsAdaptive::handleData(const Interest& interest, const Data& data
 
   // upon finding congestion mark, decrease the window size
   // without retransmitting any packet
-  if (data.getCongestionMark() > 0 ) {
+  if (data.getCongestionMark() > 0 && false) {
     m_nCongMarks++;
     if (!m_options.ignoreCongMarks) {
       if (m_options.disableCwa || m_highData > m_recPoint) {
         m_recPoint = m_highInterest;  // react to only one congestion event (timeout or congestion mark)
                                       // per RTT (conservative window adaptation)
         m_nMarkDecr++;
+        std::cout << "ECN->inflight" <<m_nInFlight << "window" << m_cwnd <<"rto"<<m_rttEstimator.getSmoothedRtt() <<std::endl;
         decreaseWindow();
 
         if (m_options.isVerbose) {
@@ -271,10 +274,12 @@ PipelineInterestsAdaptive::handleData(const Interest& interest, const Data& data
     }
     else {
       increaseWindow();
+      std::cout << "inflight" <<m_nInFlight << "window" << m_cwnd <<std::endl;
     }
   }
   else {
     increaseWindow();
+    std::cout << "inflight" <<m_nInFlight << "window" << m_cwnd <<std::endl;
   }
 
   onData(data);
@@ -353,7 +358,7 @@ PipelineInterestsAdaptive::recordTimeout()
   if (m_options.disableCwa || m_highData > m_recPoint) {
     // react to only one timeout per RTT (conservative window adaptation)
     m_recPoint = m_highInterest;
-
+    std::cout << "timeout->inflight" <<m_nInFlight << "window" << m_cwnd <<"rto"<<m_rttEstimator.getSmoothedRtt() <<std::endl;
     decreaseWindow();
     m_rttEstimator.backoffRto();
     m_nLossDecr++;
