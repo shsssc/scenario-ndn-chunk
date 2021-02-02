@@ -39,4 +39,4 @@ add_executable(extensions
         extensions/put/putChunks.cpp
         extensions/put/putChunks.hpp
         scenarios/ndn-simple.cpp
-        extensions/netblt/NetBLT.cpp extensions/netblt/NetBLT.h extensions/netblt/NetBLTApp.cpp extensions/netblt/NetBLTApp.h extensions/netblt/options.h scenarios/multiple.cpp scenarios/ndn-simple-mpi.cpp)
+        extensions/netblt/NetBLT.cpp extensions/netblt/NetBLT.h extensions/netblt/NetBLTApp.cpp extensions/netblt/NetBLTApp.h extensions/netblt/options.h scenarios/multiple.cpp scenarios/typologyReader.cpp)
