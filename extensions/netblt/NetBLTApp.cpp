@@ -30,7 +30,7 @@ void ndn::NetBLTApp::printStats() {
   duration<double, seconds::period> timeElapsed = steady_clock::now() - m_startTime;
   double throughput = 8 * m_bytesTransfered / timeElapsed.count();
 
-  std::cerr << "\n\nAll segments have been received.\n"
+  std::cout << "\n\nAll segments have been received.\n"
             << "Time elapsed: " << timeElapsed << "\n"
             << "Segments received: " << m_lastSegment + 1 << "\n" //todo this could be bad
             << "Transferred size: " << m_bytesTransfered / 1e3 << " kB" << "\n"

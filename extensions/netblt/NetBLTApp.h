@@ -222,6 +222,7 @@ private:
   void printStats();
 
   void checkBalance() {
+    return;
     if (!m_fbEnabled && !m_rttEstimator.hasSamples()) {
       //wait if lack rtt
       m_scheduler.schedule(m_defaultRTT, [this] { checkBalance(); });
