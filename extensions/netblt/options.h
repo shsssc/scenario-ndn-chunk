@@ -37,9 +37,9 @@ struct Options {
     uint32_t m_SOSSz = 15000;
 
     //flow
-    double m_burstSz = 100;
+    double m_burstSz = 10;
     uint32_t m_minBurstSz = 1;
-    time::milliseconds m_burstInterval_ms{5};
+    time::milliseconds m_burstInterval_ms{2};
 
     //time
     time::milliseconds m_defaultRTT{200};
