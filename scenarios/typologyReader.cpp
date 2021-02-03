@@ -60,26 +60,32 @@ main(int argc, char* argv[])
 
   Ptr<Node> producer1 = Names::Find<Node>("Dst1");
   Ptr<Node> producer2 = Names::Find<Node>("Dst2");
-  ndn::AppHelper consumerHelper("NetBLT");
-  ndn::AppHelper consumerHelper1("NetBLT");
+  ndn::AppHelper consumerHelper("CatChunks");
+  ndn::AppHelper consumerHelper1("CatChunks");
 
   // on the first consumer node install a Consumer application
   // that will express interests in /dst1 namespace
   consumerHelper.SetAttribute("Prefix", StringValue("/dst1"));
   consumerHelper.Install(consumer1);
+  if (systemId == 0){
+    ndn::L3RateTracer::Install(consumer1, "consumer1.txt", Seconds(0.2));
+  }
 
   // on the second consumer node install a Consumer application
   // that will express interests in /dst2 namespace
   consumerHelper1.SetAttribute("Prefix", StringValue("/dst2"));
   consumerHelper1.Install(consumer2);
+  if (systemId == 1){
+    ndn::L3RateTracer::Install(consumer2, "consumer2.txt", Seconds(0.2));
+  }
 
   ndn::AppHelper producerHelper("PutChunks");
   producerHelper.SetAttribute("Prefix", StringValue("/dst1"));
-  producerHelper.SetAttribute("size", StringValue("2500000000"));
+  producerHelper.SetAttribute("size", StringValue("200000000"));
 
   ndn::AppHelper producerHelper1("PutChunks");
   producerHelper1.SetAttribute("Prefix", StringValue("/dst2"));
-  producerHelper1.SetAttribute("size", StringValue("2500000000"));
+  producerHelper1.SetAttribute("size", StringValue("200000000"));
 
   // Register /dst1 prefix with global routing controller and
   // install producer that will satisfy Interests in /dst1 namespace
@@ -96,7 +102,7 @@ main(int argc, char* argv[])
   // Calculate and install FIBs
   ndn::GlobalRoutingHelper::CalculateRoutes();
 
-  Simulator::Stop(Seconds(20.0));
+  Simulator::Stop(Seconds(25.0));
 
   Simulator::Run();
   MpiInterface::Disable();

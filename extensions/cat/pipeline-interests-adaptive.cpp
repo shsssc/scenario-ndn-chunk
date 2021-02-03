@@ -105,7 +105,7 @@ PipelineInterestsAdaptive::checkRto()
       if (timeElapsed > segInfo.rto) { // timer expired?
         m_nTimeouts++;
         hasTimeout = true;
-        std::cout << "timeout" <<entry.first<<std::endl;
+        //std::cout << "timeout" <<entry.first<<std::endl;
         enqueueForRetransmission(entry.first);
       }
     }
@@ -161,7 +161,7 @@ PipelineInterestsAdaptive::sendInterest(uint64_t segNo, bool isRetransmission)
                   .setCanBePrefix(false)
                   .setMustBeFresh(m_options.mustBeFresh)
                   .setInterestLifetime(m_options.interestLifetime);
-  std::cout << "express interest with seg" << segNo<< " rto: "<<m_rttEstimator.getEstimatedRto().count()/1000000 <<std::endl;
+  //std::cout << "express interest with seg" << segNo<< " rto: "<<m_rttEstimator.getEstimatedRto().count()/1000000 <<std::endl;
   SegmentInfo& segInfo = m_segmentInfo[segNo];
   segInfo.interestHdl = m_face.expressInterest(interest,
                                                bind(&PipelineInterestsAdaptive::handleData, this, _1, _2),
@@ -230,7 +230,7 @@ PipelineInterestsAdaptive::handleData(const Interest& interest, const Data& data
   }
 
   uint64_t recvSegNo = getSegmentFromPacket(data);
-  std::cout << "ack" <<recvSegNo<<std::endl;
+  //std::cout << "ack" <<recvSegNo<<std::endl;
   auto segIt = m_segmentInfo.find(recvSegNo);
   if (segIt == m_segmentInfo.end()) {
     return; // ignore already-received segment
@@ -279,7 +279,7 @@ PipelineInterestsAdaptive::handleData(const Interest& interest, const Data& data
   }
   else {
     increaseWindow();
-    std::cout << "inflight" <<m_nInFlight << "window" << m_cwnd <<std::endl;
+    //std::cout << "inflight" <<m_nInFlight << "window" << m_cwnd <<std::endl;
   }
 
   onData(data);
@@ -358,7 +358,7 @@ PipelineInterestsAdaptive::recordTimeout()
   if (m_options.disableCwa || m_highData > m_recPoint) {
     // react to only one timeout per RTT (conservative window adaptation)
     m_recPoint = m_highInterest;
-    std::cout << "timeout->inflight" <<m_nInFlight << "window" << m_cwnd <<"rto"<<m_rttEstimator.getSmoothedRtt() <<std::endl;
+   // std::cout << "timeout->inflight" <<m_nInFlight << "window" << m_cwnd <<"rto"<<m_rttEstimator.getSmoothedRtt() <<std::endl;
     decreaseWindow();
     m_rttEstimator.backoffRto();
     m_nLossDecr++;

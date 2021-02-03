@@ -10,3 +10,5 @@ build/
 cmake-build-debug/
 rate-trace.txt
 
+/consumer1.txt
+/consumer2.txt

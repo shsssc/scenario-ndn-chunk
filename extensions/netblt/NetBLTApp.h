@@ -174,7 +174,7 @@ private:
     //only decrease once in one rtt.
     if (diff < m_defaultRTT || diff < m_rttEstimator.getSmoothedRtt()) return false;
 
-    m_burstSz /= weak ? 1.1 : 2;
+    m_burstSz /= weak ? 1.1 : 1.7;
     std::cerr << "just reduced window size" << m_burstSz << std::endl;
     if (m_burstSz < m_minBurstSz)m_burstSz = m_minBurstSz;
     m_lastDecrease = now;
