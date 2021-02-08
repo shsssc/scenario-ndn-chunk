@@ -21,11 +21,11 @@
 
 namespace ndn {
 struct SegmentInfo {
-    ScopedPendingInterestHandle interestHdl;
-    time::steady_clock::TimePoint timeSent;
-    time::nanoseconds rto;
-    bool inRtQueue = false;
-    bool retransmitted = false;
+  ScopedPendingInterestHandle interestHdl;
+  time::steady_clock::TimePoint timeSent;
+  time::nanoseconds rto;
+  bool inRtQueue = false;
+  bool retransmitted = false;
 };
 
 class NetBLTApp {
@@ -43,19 +43,21 @@ public:
     m_minBurstSz = m_options.m_minBurstSz;
     m_defaultRTT = m_options.m_defaultRTT;
     m_unbalanceCountThreshold = m_options.m_unbalanceCountThreshold;
+    m_burstInterval_ms = m_options.m_burstInterval_ms;
   }
 
   void run() {
     m_startTime = time::steady_clock::now();
+    m_lastDecrease = m_startTime;
     m_dv->onDiscoverySuccess.connect([this](const Name &versionedName) {
-        std::cerr << "Discovered version " << versionedName << std::endl;
-        m_versionedName = versionedName;
-        checkBalance();
-        fetchLoop();
+      std::cerr << "Discovered version " << versionedName << std::endl;
+      m_versionedName = versionedName;
+      checkBalance();
+      fetchLoop();
     });
     m_dv->onDiscoveryFailure.connect([](const std::string &msg) {
-        std::cout << msg;
-        NDN_THROW(std::runtime_error(msg));
+      std::cout << msg;
+      NDN_THROW(std::runtime_error(msg));
     });
     m_dv->run();
   }
@@ -84,13 +86,13 @@ private:
       m_nextSegment++;
     }
     auto interest = Interest()
-       .setName(Name(m_versionedName).appendSegment(segToFetch))
-       .setCanBePrefix(false)
-       .setMustBeFresh(true)
-       .setInterestLifetime(time::milliseconds(1000));
+            .setName(Name(m_versionedName).appendSegment(segToFetch))
+            .setCanBePrefix(false)
+            .setMustBeFresh(true)
+            .setInterestLifetime(time::milliseconds(1000));
     if (m_rttEstimator.hasSamples()) {
       interest.setInterestLifetime(
-         time::milliseconds(m_rttEstimator.getEstimatedRto().count() / 1000000));
+              time::milliseconds(m_rttEstimator.getEstimatedRto().count() / 1000000));
     }
     //.setInterestLifetime(m_optVD.interestLifetime);//todo
     SegmentInfo &tmp = m_inNetworkPkt[segToFetch];
@@ -172,9 +174,16 @@ private:
     auto now = time::steady_clock::now();
     auto diff = now - m_lastDecrease;
     //only decrease once in one rtt.
-    if (diff < m_defaultRTT || diff < m_rttEstimator.getSmoothedRtt()) return false;
+    if (diff < m_defaultRTT && !m_rttEstimator.hasSamples() ||
+        m_rttEstimator.hasSamples() && diff < m_rttEstimator.getSmoothedRtt()*1.3)
+      return false;
 
-    m_burstSz /= weak ? 1.1 : 1.7;
+    m_burstSz = diff / m_burstInterval_ms * m_options.aiStep + m_baseBurstSz;
+    if (m_rttEstimator.hasSamples()) {
+      m_burstSz -= m_rttEstimator.getSmoothedRtt() / m_burstInterval_ms * m_options.aiStep;
+    }
+    m_burstSz /= weak ? 1.1 : 2;
+    m_baseBurstSz = m_burstSz;
     std::cerr << "just reduced window size" << m_burstSz << std::endl;
     if (m_burstSz < m_minBurstSz)m_burstSz = m_minBurstSz;
     m_lastDecrease = now;
@@ -182,6 +191,10 @@ private:
   }
 
   void increaseWindow() {
+    auto now = time::steady_clock::now();
+    auto diff = now - m_lastDecrease;
+    m_burstSz = diff / m_burstInterval_ms * m_options.aiStep + m_baseBurstSz;
+    //std::cout << now <<"\t" <<m_burstSz <<std::endl;
     //return;
     //slow start
     //if (m_burstSz < 100) {
@@ -189,7 +202,7 @@ private:
     //  return;
     //}
     //congestion avoidance
-    m_burstSz += m_options.aiStep / m_burstSz;
+    //m_burstSz += m_options.aiStep / m_burstSz;
     //std::cerr <<"just increased window size" << m_burstSz<<std::endl;
   }
 
@@ -238,8 +251,8 @@ private:
       return;
     }
     //now we have fb enabled and estimator ready
-    if (m_sentLastRTT > m_receivedThisRTT +5) m_unbalance_count++;
-    std::cerr << m_sentLastRTT<<"\t"<< m_receivedThisRTT <<std::endl;
+    if (m_sentLastRTT > m_receivedThisRTT + 5) m_unbalance_count++;
+    std::cerr << m_sentLastRTT << "\t" << m_receivedThisRTT << std::endl;
     m_sentLastRTT = m_sentThisRTT;
     m_sentThisRTT = 0;
     m_receivedThisRTT = 0;
@@ -278,6 +291,7 @@ private:
 
   //flow control
   double m_burstSz;
+  double m_baseBurstSz = 0;
   uint32_t m_minBurstSz;
   time::milliseconds m_burstInterval_ms;
   time::steady_clock::TimePoint m_lastDecrease;
