@@ -25,7 +25,7 @@ struct Options {
     bool disableCwa = false;      ///< disable conservative window adaptation
 
     // AIMD pipeline options
-    double aiStep = 0.5;          ///< AIMD additive increase step (in segments)
+    double aiStep = 0.2;          ///< AIMD additive increase step (in segments)
     double mdCoef = 0.5;          ///< AIMD multiplicative decrease factor
     bool resetCwndToInit = false; ///< reduce cwnd to initCwnd when loss event occurs
 
@@ -39,7 +39,7 @@ struct Options {
     //flow
     double m_burstSz = 10;
     uint32_t m_minBurstSz = 1;
-    time::milliseconds m_burstInterval_ms{2};
+    time::milliseconds m_burstInterval_ms{5};
 
     //time
     time::milliseconds m_defaultRTT{200};

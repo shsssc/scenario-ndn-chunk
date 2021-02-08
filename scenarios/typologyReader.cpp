@@ -60,8 +60,8 @@ main(int argc, char* argv[])
 
   Ptr<Node> producer1 = Names::Find<Node>("Dst1");
   Ptr<Node> producer2 = Names::Find<Node>("Dst2");
-  ndn::AppHelper consumerHelper("CatChunks");
-  ndn::AppHelper consumerHelper1("CatChunks");
+  ndn::AppHelper consumerHelper("NetBLT");
+  ndn::AppHelper consumerHelper1("NetBLT");
 
   // on the first consumer node install a Consumer application
   // that will express interests in /dst1 namespace
@@ -102,7 +102,7 @@ main(int argc, char* argv[])
   // Calculate and install FIBs
   ndn::GlobalRoutingHelper::CalculateRoutes();
 
-  Simulator::Stop(Seconds(25.0));
+  Simulator::Stop(Seconds(120.0));
 
   Simulator::Run();
   MpiInterface::Disable();
