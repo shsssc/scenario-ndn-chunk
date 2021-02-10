@@ -35,7 +35,8 @@ public:
                                       m_burstInterval_ms(5), m_SOSSz(10000), m_defaultRTT(140),
                                       m_nextToPrint(0), m_bytesTransfered(0),
                                       m_retransmissionCount(0), m_startTime(), m_lastSegment(0),
-                                      m_frtCounter(0), m_fbEnabled(false),
+                                      m_frtCounter(0), m_fbEnabled(false), m_highRequested(0),
+                                      m_lastDecreaseSegment(0), m_highAcked(0),
                                       m_scheduler(m_face.getIoService()) {
     m_dv = make_unique<chunks::DiscoverVersion>(m_face, m_prefix, m_optVD);
     m_SOSSz = m_options.m_SOSSz;
@@ -101,7 +102,14 @@ private:
                            bind(&NetBLTApp::handleData, this, _1, _2),
                            bind(&NetBLTApp::handleNack, this, _1, _2),
                            bind(&NetBLTApp::handleTimeout, this, _1));
+    if (m_options.isVerbose) {
+      std::cout << "express, " << segToFetch << "," << time::steady_clock::now().time_since_epoch().count() / 1000000
+                << "," << m_burstSz
+                << std::endl;
+    }
+
     m_sentThisRTT++;
+    if (segToFetch > m_highRequested)m_highRequested = segToFetch;
     return true;
   }
 
@@ -124,6 +132,10 @@ private:
       std::cerr << "last segment: " << m_lastSegment << std::endl;
     }
     uint32_t segment = data.getName()[-1].toSegment();
+
+
+
+    //measure
     if (m_inNetworkPkt.find(segment) != m_inNetworkPkt.end()) {
       if (!m_inNetworkPkt[segment].retransmitted)
         m_rttEstimator.addMeasurement(time::steady_clock::now() - m_inNetworkPkt[segment].timeSent);
@@ -139,7 +151,13 @@ private:
     //          << m_inNetworkPkt.size() << std::endl;
     outputData();
     increaseWindow();
-
+    //we output window after change
+    if (m_options.isVerbose) {
+      std::cout << "ack, " << segment << "," << time::steady_clock::now().time_since_epoch().count() / 1000000 << ","
+                << m_burstSz
+                << std::endl;
+    }
+    if (segment > m_highAcked)m_highAcked = segment;
   }
 
   void
@@ -152,6 +170,12 @@ private:
     uint32_t segment = interest.getName()[-1].toSegment();
     //std::cerr << "timeout" << std::endl;
     decreaseWindow();
+    if (m_options.isVerbose) {
+      std::cout << "timeout, " << segment << "," << time::steady_clock::now().time_since_epoch().count() / 1000000
+                << ","
+                << m_burstSz
+                << std::endl;
+    }
     //std::cerr << interest.getName()[-1].toSegment();
     retransmit(segment);
   }
@@ -174,26 +198,39 @@ private:
     auto now = time::steady_clock::now();
     auto diff = now - m_lastDecrease;
     //only decrease once in one rtt.
+    //if (m_lastDecreaseSegment >= m_highAcked) return false;
+
     if (diff < m_defaultRTT && !m_rttEstimator.hasSamples() ||
-        m_rttEstimator.hasSamples() && diff < m_rttEstimator.getSmoothedRtt()*1.3)
+        m_rttEstimator.hasSamples() && diff < m_rttEstimator.getSmoothedRtt() * 1.2)
       return false;
 
-    m_burstSz = diff / m_burstInterval_ms * m_options.aiStep + m_baseBurstSz;
-    if (m_rttEstimator.hasSamples()) {
-      m_burstSz -= m_rttEstimator.getSmoothedRtt() / m_burstInterval_ms * m_options.aiStep;
+    if (!m_options.simpleWindowAdj) {
+      //this formula is experimental
+      m_burstSz = diff / m_burstInterval_ms * m_options.aiStep + m_baseBurstSz;
+      if (m_rttEstimator.hasSamples() && false) {
+        //decrease one more RTT for detection latency
+        m_burstSz -= m_rttEstimator.getSmoothedRtt() / m_burstInterval_ms * m_options.aiStep;
+      }
     }
+
     m_burstSz /= weak ? 1.1 : 2;
     m_baseBurstSz = m_burstSz;
-    std::cerr << "just reduced window size" << m_burstSz << std::endl;
+    std::cerr << "just reduced window size to " << m_burstSz << std::endl;
     if (m_burstSz < m_minBurstSz)m_burstSz = m_minBurstSz;
     m_lastDecrease = now;
+    m_lastDecreaseSegment = m_highRequested+1;
     return true;
   }
 
   void increaseWindow() {
-    auto now = time::steady_clock::now();
-    auto diff = now - m_lastDecrease;
-    m_burstSz = diff / m_burstInterval_ms * m_options.aiStep + m_baseBurstSz;
+    if (!m_options.simpleWindowAdj) {
+      auto now = time::steady_clock::now();
+      auto diff = now - m_lastDecrease;
+      m_burstSz = diff / m_burstInterval_ms * m_options.aiStep + m_baseBurstSz;
+    } else {
+      m_burstSz += m_options.aiStep / m_burstSz;
+    }
+
     //std::cout << now <<"\t" <<m_burstSz <<std::endl;
     //return;
     //slow start
@@ -221,12 +258,21 @@ private:
     if (m_frtCounter > m_burstSz && decreaseWindow()) {
       std::cerr << "FRT\n";
       //we retransmit the entire unhandled
+      //std::cerr <<  (m_dataBuffer.find(m_nextToPrint) != m_dataBuffer.end()) <<std::endl;
       for (int i = m_nextToPrint;
-           m_dataBuffer.find(i) != m_dataBuffer.end() && i < m_burstSz / 2 + m_nextToPrint; i++) {
+           m_inNetworkPkt.find(i) != m_inNetworkPkt.end() && i < m_burstSz + m_nextToPrint; i++) {
         //  for (uint32_t i = m_nextToPrint; i < m_burstSz + m_nextToPrint; i++) {
+        std::cerr << i << "\n";
         retransmit(i);
       }
       m_frtCounter = 0;//not so useful since decrease window is checking for us.
+    }
+
+    if (m_options.isVerbose) {
+      std::cout << "ackgap, " << m_nextToPrint << "," << time::steady_clock::now().time_since_epoch().count() / 1000000
+                << ","
+                << m_burstSz
+                << std::endl;
     }
 
     return true;
@@ -287,7 +333,7 @@ private:
 
   //SOS
   uint32_t m_SOSSz;
-  std::map<uint32_t, SegmentInfo> m_inNetworkPkt;
+  std::map<uint32_t, SegmentInfo> m_inNetworkPkt; //must be map to check SOS
 
   //flow control
   double m_burstSz;
@@ -299,7 +345,9 @@ private:
   //uint32_t m_frtThreshold;
   uint32_t m_frtCounter;
   //uint32_t m_afterGap;
-
+  uint32_t m_highRequested;
+  uint32_t m_lastDecreaseSegment;
+  uint32_t m_highAcked;
 
   //stats
   uint64_t m_bytesTransfered;

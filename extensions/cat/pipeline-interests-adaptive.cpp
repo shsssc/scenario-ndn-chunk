@@ -37,38 +37,21 @@ namespace chunks {
 
 constexpr double PipelineInterestsAdaptive::MIN_SSTHRESH;
 
-PipelineInterestsAdaptive::PipelineInterestsAdaptive(Face& face,
-                                                     RttEstimatorWithStats& rttEstimator,
-                                                     const Options& opts)
-  : PipelineInterests(face, opts)
-  , m_cwnd(m_options.initCwnd)
-  , m_ssthresh(m_options.initSsthresh)
-  , m_rttEstimator(rttEstimator)
-  , m_scheduler(m_face.getIoService())
-  , m_highData(0)
-  , m_highInterest(0)
-  , m_recPoint(0)
-  , m_nInFlight(0)
-  , m_nLossDecr(0)
-  , m_nMarkDecr(0)
-  , m_nTimeouts(0)
-  , m_nSkippedRetx(0)
-  , m_nRetransmitted(0)
-  , m_nCongMarks(0)
-  , m_nSent(0)
-  , m_hasFailure(false)
-  , m_failedSegNo(0)
-{
+PipelineInterestsAdaptive::PipelineInterestsAdaptive(Face &face,
+                                                     RttEstimatorWithStats &rttEstimator,
+                                                     const Options &opts)
+        : PipelineInterests(face, opts), m_cwnd(m_options.initCwnd), m_ssthresh(m_options.initSsthresh),
+          m_rttEstimator(rttEstimator), m_scheduler(m_face.getIoService()), m_highData(0), m_highInterest(0),
+          m_recPoint(0), m_nInFlight(0), m_nLossDecr(0), m_nMarkDecr(0), m_nTimeouts(0), m_nSkippedRetx(0),
+          m_nRetransmitted(0), m_nCongMarks(0), m_nSent(0), m_hasFailure(false), m_failedSegNo(0) {
 }
 
-PipelineInterestsAdaptive::~PipelineInterestsAdaptive()
-{
+PipelineInterestsAdaptive::~PipelineInterestsAdaptive() {
   cancel();
 }
 
 void
-PipelineInterestsAdaptive::doRun()
-{
+PipelineInterestsAdaptive::doRun() {
   if (allSegmentsReceived()) {
     cancel();
     if (!m_options.isQuiet) {
@@ -84,28 +67,31 @@ PipelineInterestsAdaptive::doRun()
 }
 
 void
-PipelineInterestsAdaptive::doCancel()
-{
+PipelineInterestsAdaptive::doCancel() {
   m_checkRtoEvent.cancel();
   m_segmentInfo.clear();
 }
 
 void
-PipelineInterestsAdaptive::checkRto()
-{
+PipelineInterestsAdaptive::checkRto() {
   if (isStopping())
     return;
 
   bool hasTimeout = false;
 
-  for (auto& entry : m_segmentInfo) {
-    SegmentInfo& segInfo = entry.second;
+  for (auto &entry : m_segmentInfo) {
+    SegmentInfo &segInfo = entry.second;
     if (segInfo.state != SegmentState::InRetxQueue) { // skip segments already in the retx queue
       auto timeElapsed = time::steady_clock::now() - segInfo.timeSent;
       if (timeElapsed > segInfo.rto) { // timer expired?
         m_nTimeouts++;
         hasTimeout = true;
-        //std::cout << "timeout" <<entry.first<<std::endl;
+
+        std::cout << "timeout, " << entry.first << "," << time::steady_clock::now().time_since_epoch().count() / 1000000
+                  << ","
+                  << m_cwnd
+                  << std::endl;
+
         enqueueForRetransmission(entry.first);
       }
     }
@@ -121,8 +107,7 @@ PipelineInterestsAdaptive::checkRto()
 }
 
 void
-PipelineInterestsAdaptive::sendInterest(uint64_t segNo, bool isRetransmission)
-{
+PipelineInterestsAdaptive::sendInterest(uint64_t segNo, bool isRetransmission) {
   if (isStopping())
     return;
 
@@ -137,6 +122,10 @@ PipelineInterestsAdaptive::sendInterest(uint64_t segNo, bool isRetransmission)
               << " segment #" << segNo << std::endl;
   }
 
+  std::cout << "express, " << segNo << "," << time::steady_clock::now().time_since_epoch().count() / 1000000
+            << "," << m_cwnd
+            << std::endl;
+
   if (isRetransmission) {
     // keep track of retx count for this segment
     auto ret = m_retxCount.emplace(segNo, 1);
@@ -145,8 +134,8 @@ PipelineInterestsAdaptive::sendInterest(uint64_t segNo, bool isRetransmission)
       if (m_options.maxRetriesOnTimeoutOrNack != DataFetcher::MAX_RETRIES_INFINITE &&
           m_retxCount[segNo] > m_options.maxRetriesOnTimeoutOrNack) {
         return handleFail(segNo, "Reached the maximum number of retries (" +
-                          to_string(m_options.maxRetriesOnTimeoutOrNack) +
-                          ") while retrieving segment #" + to_string(segNo));
+                                 to_string(m_options.maxRetriesOnTimeoutOrNack) +
+                                 ") while retrieving segment #" + to_string(segNo));
       }
 
       if (m_options.isVerbose) {
@@ -157,12 +146,12 @@ PipelineInterestsAdaptive::sendInterest(uint64_t segNo, bool isRetransmission)
   }
 
   auto interest = Interest()
-                  .setName(Name(m_prefix).appendSegment(segNo))
-                  .setCanBePrefix(false)
-                  .setMustBeFresh(m_options.mustBeFresh)
-                  .setInterestLifetime(m_options.interestLifetime);
+          .setName(Name(m_prefix).appendSegment(segNo))
+          .setCanBePrefix(false)
+          .setMustBeFresh(m_options.mustBeFresh)
+          .setInterestLifetime(m_options.interestLifetime);
   //std::cout << "express interest with seg" << segNo<< " rto: "<<m_rttEstimator.getEstimatedRto().count()/1000000 <<std::endl;
-  SegmentInfo& segInfo = m_segmentInfo[segNo];
+  SegmentInfo &segInfo = m_segmentInfo[segNo];
   segInfo.interestHdl = m_face.expressInterest(interest,
                                                bind(&PipelineInterestsAdaptive::handleData, this, _1, _2),
                                                bind(&PipelineInterestsAdaptive::handleNack, this, _1, _2),
@@ -176,16 +165,14 @@ PipelineInterestsAdaptive::sendInterest(uint64_t segNo, bool isRetransmission)
   if (isRetransmission) {
     segInfo.state = SegmentState::Retransmitted;
     m_nRetransmitted++;
-  }
-  else {
+  } else {
     m_highInterest = segNo;
     segInfo.state = SegmentState::FirstTimeSent;
   }
 }
 
 void
-PipelineInterestsAdaptive::schedulePackets()
-{
+PipelineInterestsAdaptive::schedulePackets() {
   BOOST_ASSERT(m_nInFlight >= 0);
   auto availableWindowSize = static_cast<int64_t>(m_cwnd) - m_nInFlight;
 
@@ -199,8 +186,7 @@ PipelineInterestsAdaptive::schedulePackets()
       }
       // the segment is still in the map, that means it needs to be retransmitted
       sendInterest(retxSegNo, true);
-    }
-    else { // send next segment
+    } else { // send next segment
       sendInterest(getNextSegmentNo(), false);
     }
     availableWindowSize--;
@@ -208,8 +194,7 @@ PipelineInterestsAdaptive::schedulePackets()
 }
 
 void
-PipelineInterestsAdaptive::handleData(const Interest& interest, const Data& data)
-{
+PipelineInterestsAdaptive::handleData(const Interest &interest, const Data &data) {
   if (isStopping())
     return;
   //std::cout << "inflight" <<m_nInFlight << "window" << m_cwnd <<"rto"<<m_rttEstimator.getSmoothedRtt() <<std::endl;
@@ -223,20 +208,21 @@ PipelineInterestsAdaptive::handleData(const Interest& interest, const Data& data
     if (m_hasFailure && m_lastSegmentNo >= m_failedSegNo) {
       // previously failed segment is part of the content
       return onFailure(m_failureReason);
-    }
-    else {
+    } else {
       m_hasFailure = false;
     }
   }
 
   uint64_t recvSegNo = getSegmentFromPacket(data);
-  //std::cout << "ack" <<recvSegNo<<std::endl;
+  std::cout << "ack, " << recvSegNo << "," << time::steady_clock::now().time_since_epoch().count() / 1000000 << ","
+            << m_cwnd
+            << std::endl;
   auto segIt = m_segmentInfo.find(recvSegNo);
   if (segIt == m_segmentInfo.end()) {
     return; // ignore already-received segment
   }
 
-  SegmentInfo& segInfo = segIt->second;
+  SegmentInfo &segInfo = segIt->second;
   time::nanoseconds rtt = time::steady_clock::now() - segInfo.timeSent;
   if (m_options.isVerbose) {
     std::cerr << "Received segment #" << recvSegNo
@@ -261,9 +247,10 @@ PipelineInterestsAdaptive::handleData(const Interest& interest, const Data& data
     if (!m_options.ignoreCongMarks) {
       if (m_options.disableCwa || m_highData > m_recPoint) {
         m_recPoint = m_highInterest;  // react to only one congestion event (timeout or congestion mark)
-                                      // per RTT (conservative window adaptation)
+        // per RTT (conservative window adaptation)
         m_nMarkDecr++;
-        std::cout << "ECN->inflight" <<m_nInFlight << "window" << m_cwnd <<"rto"<<m_rttEstimator.getSmoothedRtt() <<std::endl;
+        std::cout << "ECN->inflight" << m_nInFlight << "window" << m_cwnd << "rto" << m_rttEstimator.getSmoothedRtt()
+                  << std::endl;
         decreaseWindow();
 
         if (m_options.isVerbose) {
@@ -271,13 +258,11 @@ PipelineInterestsAdaptive::handleData(const Interest& interest, const Data& data
                     << ", new cwnd = " << m_cwnd << std::endl;
         }
       }
-    }
-    else {
+    } else {
       increaseWindow();
-      std::cout << "inflight" <<m_nInFlight << "window" << m_cwnd <<std::endl;
+      std::cout << "inflight" << m_nInFlight << "window" << m_cwnd << std::endl;
     }
-  }
-  else {
+  } else {
     increaseWindow();
     //std::cout << "inflight" <<m_nInFlight << "window" << m_cwnd <<std::endl;
   }
@@ -305,15 +290,13 @@ PipelineInterestsAdaptive::handleData(const Interest& interest, const Data& data
     if (!m_options.isQuiet) {
       printSummary();
     }
-  }
-  else {
+  } else {
     schedulePackets();
   }
 }
 
 void
-PipelineInterestsAdaptive::handleNack(const Interest& interest, const lp::Nack& nack)
-{
+PipelineInterestsAdaptive::handleNack(const Interest &interest, const lp::Nack &nack) {
   if (isStopping())
     return;
 
@@ -335,14 +318,13 @@ PipelineInterestsAdaptive::handleNack(const Interest& interest, const lp::Nack& 
       break;
     default:
       handleFail(segNo, "Could not retrieve data for " + interest.getName().toUri() +
-                 ", reason: " + boost::lexical_cast<std::string>(nack.getReason()));
+                        ", reason: " + boost::lexical_cast<std::string>(nack.getReason()));
       break;
   }
 }
 
 void
-PipelineInterestsAdaptive::handleLifetimeExpiration(const Interest& interest)
-{
+PipelineInterestsAdaptive::handleLifetimeExpiration(const Interest &interest) {
   if (isStopping())
     return;
 
@@ -353,12 +335,11 @@ PipelineInterestsAdaptive::handleLifetimeExpiration(const Interest& interest)
 }
 
 void
-PipelineInterestsAdaptive::recordTimeout()
-{
+PipelineInterestsAdaptive::recordTimeout() {
   if (m_options.disableCwa || m_highData > m_recPoint) {
     // react to only one timeout per RTT (conservative window adaptation)
     m_recPoint = m_highInterest;
-   // std::cout << "timeout->inflight" <<m_nInFlight << "window" << m_cwnd <<"rto"<<m_rttEstimator.getSmoothedRtt() <<std::endl;
+    // std::cout << "timeout->inflight" <<m_nInFlight << "window" << m_cwnd <<"rto"<<m_rttEstimator.getSmoothedRtt() <<std::endl;
     decreaseWindow();
     m_rttEstimator.backoffRto();
     m_nLossDecr++;
@@ -371,8 +352,7 @@ PipelineInterestsAdaptive::recordTimeout()
 }
 
 void
-PipelineInterestsAdaptive::enqueueForRetransmission(uint64_t segNo)
-{
+PipelineInterestsAdaptive::enqueueForRetransmission(uint64_t segNo) {
   BOOST_ASSERT(m_nInFlight > 0);
   m_nInFlight--;
   m_retxQueue.push(segNo);
@@ -380,8 +360,7 @@ PipelineInterestsAdaptive::enqueueForRetransmission(uint64_t segNo)
 }
 
 void
-PipelineInterestsAdaptive::handleFail(uint64_t segNo, const std::string& reason)
-{
+PipelineInterestsAdaptive::handleFail(uint64_t segNo, const std::string &reason) {
   if (isStopping())
     return;
 
@@ -395,8 +374,7 @@ PipelineInterestsAdaptive::handleFail(uint64_t segNo, const std::string& reason)
 
     if (m_segmentInfo.empty()) {
       onFailure("Fetching terminated but no final segment number has been found");
-    }
-    else {
+    } else {
       cancelInFlightSegmentsGreaterThan(segNo);
       m_hasFailure = true;
       m_failedSegNo = segNo;
@@ -406,39 +384,35 @@ PipelineInterestsAdaptive::handleFail(uint64_t segNo, const std::string& reason)
 }
 
 void
-PipelineInterestsAdaptive::cancelInFlightSegmentsGreaterThan(uint64_t segNo)
-{
+PipelineInterestsAdaptive::cancelInFlightSegmentsGreaterThan(uint64_t segNo) {
   for (auto it = m_segmentInfo.begin(); it != m_segmentInfo.end();) {
     // cancel fetching all segments that follow
     if (it->first > segNo) {
       it = m_segmentInfo.erase(it);
       m_nInFlight--;
-    }
-    else {
+    } else {
       ++it;
     }
   }
 }
 
 void
-PipelineInterestsAdaptive::printOptions() const
-{
+PipelineInterestsAdaptive::printOptions() const {
   PipelineInterests::printOptions();
   std::cerr
-      << "\tInitial congestion window size = " << m_options.initCwnd << "\n"
-      << "\tInitial slow start threshold = " << m_options.initSsthresh << "\n"
-      << "\tAdditive increase step = " << m_options.aiStep << "\n"
-      << "\tMultiplicative decrease factor = " << m_options.mdCoef << "\n"
-      << "\tRTO check interval = " << m_options.rtoCheckInterval << "\n"
-      << "\tReact to congestion marks = " << (m_options.ignoreCongMarks ? "no" : "yes") << "\n"
-      << "\tConservative window adaptation = " << (m_options.disableCwa ? "no" : "yes") << "\n"
-      << "\tResetting window to " << (m_options.resetCwndToInit ?
-                                        "initial value" : "ssthresh") << " upon loss event\n";
+          << "\tInitial congestion window size = " << m_options.initCwnd << "\n"
+          << "\tInitial slow start threshold = " << m_options.initSsthresh << "\n"
+          << "\tAdditive increase step = " << m_options.aiStep << "\n"
+          << "\tMultiplicative decrease factor = " << m_options.mdCoef << "\n"
+          << "\tRTO check interval = " << m_options.rtoCheckInterval << "\n"
+          << "\tReact to congestion marks = " << (m_options.ignoreCongMarks ? "no" : "yes") << "\n"
+          << "\tConservative window adaptation = " << (m_options.disableCwa ? "no" : "yes") << "\n"
+          << "\tResetting window to " << (m_options.resetCwndToInit ?
+                                          "initial value" : "ssthresh") << " upon loss event\n";
 }
 
 void
-PipelineInterestsAdaptive::printSummary() const
-{
+PipelineInterestsAdaptive::printSummary() const {
   PipelineInterests::printSummary();
   std::cerr << "Congestion marks: " << m_nCongMarks << " (caused " << m_nMarkDecr << " window decreases)\n"
             << "Timeouts: " << m_nTimeouts << " (caused " << m_nLossDecr << " window decreases)\n"
@@ -450,8 +424,7 @@ PipelineInterestsAdaptive::printSummary() const
   if (m_rttEstimator.getMinRtt() == time::nanoseconds::max() ||
       m_rttEstimator.getMaxRtt() == time::nanoseconds::min()) {
     std::cerr << "stats unavailable\n";
-  }
-  else {
+  } else {
     std::cerr << "min/avg/max = " << std::fixed << std::setprecision(3)
               << m_rttEstimator.getMinRtt().count() / 1e6 << "/"
               << m_rttEstimator.getAvgRtt().count() / 1e6 << "/"
@@ -459,19 +432,18 @@ PipelineInterestsAdaptive::printSummary() const
   }
 }
 
-std::ostream&
-operator<<(std::ostream& os, SegmentState state)
-{
+std::ostream &
+operator<<(std::ostream &os, SegmentState state) {
   switch (state) {
-  case SegmentState::FirstTimeSent:
-    os << "FirstTimeSent";
-    break;
-  case SegmentState::InRetxQueue:
-    os << "InRetxQueue";
-    break;
-  case SegmentState::Retransmitted:
-    os << "Retransmitted";
-    break;
+    case SegmentState::FirstTimeSent:
+      os << "FirstTimeSent";
+      break;
+    case SegmentState::InRetxQueue:
+      os << "InRetxQueue";
+      break;
+    case SegmentState::Retransmitted:
+      os << "Retransmitted";
+      break;
   }
   return os;
 }

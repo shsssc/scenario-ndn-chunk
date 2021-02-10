@@ -46,14 +46,14 @@ struct Options
   size_t maxPipelineSize = 1;
 
   // Adaptive pipeline common options
-  double initCwnd = 1500.0;        ///< initial congestion window size
+  double initCwnd = 240.0;        ///< initial congestion window size
   double initSsthresh = 300; ///< initial slow start threshold
   time::milliseconds rtoCheckInterval{10}; ///< interval for checking retransmission timer
   bool ignoreCongMarks = false; ///< disable window decrease after receiving congestion mark
   bool disableCwa = false;      ///< disable conservative window adaptation
 
   // AIMD pipeline options
-  double aiStep = 60;          ///< AIMD additive increase step (in segments)
+  double aiStep = 115.2;          ///< AIMD additive increase step (in segments)
   double mdCoef = 0.5;          ///< AIMD multiplicative decrease factor
   bool resetCwndToInit = false; ///< reduce cwnd to initCwnd when loss event occurs
 

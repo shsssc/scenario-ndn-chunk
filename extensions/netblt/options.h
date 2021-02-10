@@ -12,7 +12,7 @@ struct Options {
     bool disableVersionDiscovery = false;
     bool mustBeFresh = false;
     bool isQuiet = false;
-    bool isVerbose = false;
+    bool isVerbose = true;
 
     // Fixed pipeline options
     size_t maxPipelineSize = 1;
@@ -45,6 +45,8 @@ struct Options {
     time::milliseconds m_defaultRTT{200};
 
     uint8_t m_unbalanceCountThreshold = 2;
+
+    bool simpleWindowAdj = true;
 };
 }
 #endif //EXTENSIONS_OPTIONS_H
