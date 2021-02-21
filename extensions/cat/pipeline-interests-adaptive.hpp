@@ -62,6 +62,7 @@ struct SegmentInfo
   time::steady_clock::TimePoint timeSent;
   time::nanoseconds rto;
   SegmentState state;
+  bool canTriggerTimeout = true;
 };
 
 /**

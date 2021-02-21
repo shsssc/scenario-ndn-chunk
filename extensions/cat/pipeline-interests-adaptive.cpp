@@ -78,7 +78,7 @@ PipelineInterestsAdaptive::checkRto() {
     return;
 
   bool hasTimeout = false;
-
+  bool shouldDecreaseWindow = false;
   for (auto &entry : m_segmentInfo) {
     SegmentInfo &segInfo = entry.second;
     if (segInfo.state != SegmentState::InRetxQueue) { // skip segments already in the retx queue
@@ -86,7 +86,7 @@ PipelineInterestsAdaptive::checkRto() {
       if (timeElapsed > segInfo.rto) { // timer expired?
         m_nTimeouts++;
         hasTimeout = true;
-
+        if (segInfo.canTriggerTimeout) shouldDecreaseWindow = true;
         std::cout << "timeout, " << entry.first << "," << time::steady_clock::now().time_since_epoch().count() / 1000000
                   << ","
                   << m_cwnd
@@ -96,9 +96,16 @@ PipelineInterestsAdaptive::checkRto() {
       }
     }
   }
-
-  if (hasTimeout) {
+  if (shouldDecreaseWindow) {
     recordTimeout();
+    for (auto &entry:m_segmentInfo) {
+      //we disqualify all outstanding packet at a drop event to cause another window decrease.
+      //They are not part of the "adjustment result"
+      //They will be requalified if they time out and get send
+      entry.second.canTriggerTimeout = false;
+    }
+  }
+  if (hasTimeout) {
     schedulePackets();
   }
 
@@ -158,6 +165,7 @@ PipelineInterestsAdaptive::sendInterest(uint64_t segNo, bool isRetransmission) {
                                                bind(&PipelineInterestsAdaptive::handleLifetimeExpiration, this, _1));
   segInfo.timeSent = time::steady_clock::now();
   segInfo.rto = m_rttEstimator.getEstimatedRto();
+  segInfo.canTriggerTimeout = true;
 
   m_nInFlight++;
   m_nSent++;

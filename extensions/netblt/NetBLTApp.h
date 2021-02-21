@@ -26,6 +26,9 @@ struct SegmentInfo {
   time::nanoseconds rto;
   bool inRtQueue = false;
   bool retransmitted = false;
+  //bool gapRetransmitted = false;
+  bool canTriggerTimeout = true;
+  int unsatisfiedInterest = 0;
 };
 
 class NetBLTApp {
@@ -65,6 +68,10 @@ public:
 
 
 private:
+  /**
+   * express next interest
+   * @return true if can continue to request more, false if cannot continue since bound reached
+   */
   bool expressOneInterest() {
     uint32_t segToFetch = 0;
     if (!retransmissionPQ.empty()) {
@@ -95,9 +102,12 @@ private:
       interest.setInterestLifetime(
               time::milliseconds(m_rttEstimator.getEstimatedRto().count() / 1000000));
     }
-    //.setInterestLifetime(m_optVD.interestLifetime);//todo
+    //make sure we do not have one already in flight
+    auto now = time::steady_clock::now();
     SegmentInfo &tmp = m_inNetworkPkt[segToFetch];
-    tmp.timeSent = time::steady_clock::now();
+    tmp.timeSent = now;
+    tmp.unsatisfiedInterest++;
+    tmp.canTriggerTimeout = true;
     m_face.expressInterest(interest,
                            bind(&NetBLTApp::handleData, this, _1, _2),
                            bind(&NetBLTApp::handleNack, this, _1, _2),
@@ -168,8 +178,18 @@ private:
   void
   handleTimeout(const Interest &interest) {
     uint32_t segment = interest.getName()[-1].toSegment();
-    //std::cerr << "timeout" << std::endl;
-    decreaseWindow();
+    m_inNetworkPkt[segment].unsatisfiedInterest--;
+    //only use timeout on the last instance of a single segment
+    if (m_inNetworkPkt[segment].unsatisfiedInterest > 0) {
+      std::cerr << "supress" << std::endl;
+      return;
+    }
+    if (m_inNetworkPkt.at(segment).canTriggerTimeout && decreaseWindow()) {
+      for (auto &item:m_inNetworkPkt) {
+        item.second.canTriggerTimeout = false;
+      }
+    }
+
     if (m_options.isVerbose) {
       std::cout << "timeout, " << segment << "," << time::steady_clock::now().time_since_epoch().count() / 1000000
                 << ","
@@ -177,6 +197,8 @@ private:
                 << std::endl;
     }
     //std::cerr << interest.getName()[-1].toSegment();
+
+    //do not retransmit if already detected it.
     retransmit(segment);
   }
 
@@ -201,7 +223,7 @@ private:
     //if (m_lastDecreaseSegment >= m_highAcked) return false;
 
     if (diff < m_defaultRTT && !m_rttEstimator.hasSamples() ||
-        m_rttEstimator.hasSamples() && diff < m_rttEstimator.getSmoothedRtt() * 1.2)
+        m_rttEstimator.hasSamples() && diff < m_rttEstimator.getSmoothedRtt())
       return false;
 
     if (!m_options.simpleWindowAdj) {
@@ -218,7 +240,7 @@ private:
     std::cerr << "just reduced window size to " << m_burstSz << std::endl;
     if (m_burstSz < m_minBurstSz)m_burstSz = m_minBurstSz;
     m_lastDecrease = now;
-    m_lastDecreaseSegment = m_highRequested+1;
+    m_lastDecreaseSegment = m_highRequested + 1;
     return true;
   }
 
@@ -245,27 +267,47 @@ private:
 
   bool fastRetransmission(uint32_t segment) {
     if (segment == m_nextToPrint) {
-      m_frtCounter = 0;
+      //m_frtCounter = 0;
       return false;
     }
     if (segment < m_nextToPrint) {
       return false;
     }
     //if (m_frtCounter == 0) m_afterGap = segment;
-    m_frtCounter++;
+    //m_frtCounter++;
     //we have waited a burst
     //we only do FRT once per RTT
-    if (m_frtCounter > m_burstSz && decreaseWindow()) {
-      std::cerr << "FRT\n";
-      //we retransmit the entire unhandled
-      //std::cerr <<  (m_dataBuffer.find(m_nextToPrint) != m_dataBuffer.end()) <<std::endl;
-      for (int i = m_nextToPrint;
-           m_inNetworkPkt.find(i) != m_inNetworkPkt.end() && i < m_burstSz + m_nextToPrint; i++) {
-        //  for (uint32_t i = m_nextToPrint; i < m_burstSz + m_nextToPrint; i++) {
-        std::cerr << i << "\n";
-        retransmit(i);
+    //if (m_frtCounter > m_burstSz && decreaseWindow()) {
+    //  std::cerr << "FRT\n";
+    //we retransmit the entire unhandled
+    //std::cerr <<  (m_dataBuffer.find(m_nextToPrint) != m_dataBuffer.end()) <<std::endl;
+    //  m_frtCounter = 0;//not so useful since decrease window is checking for us.
+    //}
+
+    //always retransmit
+    const uint32_t waitReorder = 7;
+    bool shouldRetransmit = segment > waitReorder && m_inNetworkPkt.find(segment - waitReorder) != m_inNetworkPkt.end();
+    for (int i = segment; i > segment - waitReorder && shouldRetransmit; i--) {
+      //recent 5 must all be ready
+      if (m_inNetworkPkt.find(i) != m_inNetworkPkt.end())shouldRetransmit = false;
+    }
+    if (!shouldRetransmit) return false;
+    for (int i = segment - waitReorder;
+         i >= segment - waitReorder - m_burstSz && m_inNetworkPkt.find(i) != m_inNetworkPkt.end(); i--) {
+      retransmit(i);
+      if (m_inNetworkPkt.at(i).canTriggerTimeout && decreaseWindow()) {
+        for (auto &item:m_inNetworkPkt) {
+          item.second.canTriggerTimeout = false;
+        }
       }
-      m_frtCounter = 0;//not so useful since decrease window is checking for us.
+    }
+    return true;
+    /*
+    for (int i = m_nextToPrint;
+         m_inNetworkPkt.find(i) != m_inNetworkPkt.end() && i < m_burstSz + m_nextToPrint; i++) {
+      //  for (uint32_t i = m_nextToPrint; i < m_burstSz + m_nextToPrint; i++) {
+      std::cerr << i << "\n";
+      retransmit(i);
     }
 
     if (m_options.isVerbose) {
@@ -276,6 +318,7 @@ private:
     }
 
     return true;
+     */
   }
 
   void printStats();
