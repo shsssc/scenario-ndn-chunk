@@ -18,6 +18,7 @@
 #include <map>
 #include "ns3/scheduler.h"
 #include "options.h"
+#include "StatisticsCollector.h"
 
 namespace ndn {
 struct SegmentInfo {
@@ -39,7 +40,7 @@ public:
                                       m_nextToPrint(0), m_bytesTransfered(0),
                                       m_retransmissionCount(0), m_startTime(), m_lastSegment(0),
                                       m_frtCounter(0), m_fbEnabled(false), m_highRequested(0),
-                                      m_lastDecreaseSegment(0), m_highAcked(0),
+                                      m_lastDecreaseSegment(0), m_highAcked(0), m_sc(),
                                       m_scheduler(m_face.getIoService()) {
     m_dv = make_unique<chunks::DiscoverVersion>(m_face, m_prefix, m_optVD);
     m_SOSSz = m_options.m_SOSSz;
@@ -56,6 +57,7 @@ public:
     m_dv->onDiscoverySuccess.connect([this](const Name &versionedName) {
       std::cerr << "Discovered version " << versionedName << std::endl;
       m_versionedName = versionedName;
+      checkDelay();
       checkBalance();
       fetchLoop();
     });
@@ -147,8 +149,12 @@ private:
 
     //measure
     if (m_inNetworkPkt.find(segment) != m_inNetworkPkt.end()) {
-      if (!m_inNetworkPkt[segment].retransmitted)
-        m_rttEstimator.addMeasurement(time::steady_clock::now() - m_inNetworkPkt[segment].timeSent);
+      if (!m_inNetworkPkt[segment].retransmitted) {
+        auto t = time::steady_clock::now() - m_inNetworkPkt[segment].timeSent;
+        m_rttEstimator.addMeasurement(t);
+        m_sc.report(t.count()/1e4);
+      }
+
       m_inNetworkPkt.erase(segment);
     }
 
@@ -235,7 +241,7 @@ private:
       }
     }
 
-    m_burstSz /= weak ? 1.1 : 2;
+    m_burstSz /= weak ? 1.33 : 2;
     m_baseBurstSz = m_burstSz;
     std::cerr << "just reduced window size to " << m_burstSz << std::endl;
     if (m_burstSz < m_minBurstSz)m_burstSz = m_minBurstSz;
@@ -341,6 +347,7 @@ private:
     }
     //now we have fb enabled and estimator ready
     if (m_sentLastRTT > m_receivedThisRTT + 5) m_unbalance_count++;
+    else m_unbalance_count = 0;
     std::cerr << m_sentLastRTT << "\t" << m_receivedThisRTT << std::endl;
     m_sentLastRTT = m_sentThisRTT;
     m_sentThisRTT = 0;
@@ -350,7 +357,14 @@ private:
       std::cerr << "balance decrease" << std::endl;
     }
     m_scheduler.schedule(m_rttEstimator.getSmoothedRtt(), [this] { checkBalance(); });
+  }
 
+  void checkDelay() {
+    m_scheduler.schedule(m_burstInterval_ms * 4, [this] { checkDelay(); });
+    if (m_sc.shouldDecrease()) {
+      std::cerr << "delay decrease" << std::endl;
+      decreaseWindow(true);
+    }
   }
 
   std::string formatThroughput(double throughput);
@@ -406,6 +420,9 @@ private:
   uint32_t m_unbalance_count;
   uint8_t m_unbalanceCountThreshold;
   bool m_fbEnabled;
+
+  //rtt
+  StatisticsCollector m_sc;
 };
 }
 

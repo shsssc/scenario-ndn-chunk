@@ -44,7 +44,7 @@ struct Options {
     //time
     time::milliseconds m_defaultRTT{200};
 
-    uint8_t m_unbalanceCountThreshold = 2;
+    uint8_t m_unbalanceCountThreshold = 1;
 
     bool simpleWindowAdj = true;
 };
