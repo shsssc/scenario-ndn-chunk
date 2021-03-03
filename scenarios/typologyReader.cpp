@@ -60,8 +60,8 @@ main(int argc, char* argv[])
 
   Ptr<Node> producer1 = Names::Find<Node>("Dst1");
   Ptr<Node> producer2 = Names::Find<Node>("Dst2");
-  ndn::AppHelper consumerHelper("NetBLT");
-  ndn::AppHelper consumerHelper1("NetBLT");
+  ndn::AppHelper consumerHelper("CatChunks");
+  ndn::AppHelper consumerHelper1("CatChunks");
 
   // on the first consumer node install a Consumer application
   // that will express interests in /dst1 namespace
@@ -81,11 +81,11 @@ main(int argc, char* argv[])
 
   ndn::AppHelper producerHelper("PutChunks");
   producerHelper.SetAttribute("Prefix", StringValue("/dst1"));
-  producerHelper.SetAttribute("size", StringValue("200000000"));
+  producerHelper.SetAttribute("size", StringValue("500000000"));
 
   ndn::AppHelper producerHelper1("PutChunks");
   producerHelper1.SetAttribute("Prefix", StringValue("/dst2"));
-  producerHelper1.SetAttribute("size", StringValue("200000000"));
+  producerHelper1.SetAttribute("size", StringValue("500000000"));
 
   // Register /dst1 prefix with global routing controller and
   // install producer that will satisfy Interests in /dst1 namespace

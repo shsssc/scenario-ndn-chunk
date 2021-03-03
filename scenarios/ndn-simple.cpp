@@ -51,7 +51,7 @@ main(int argc, char *argv[]) {
   // setting default parameters for PointToPoint links and channels
   Config::SetDefault("ns3::PointToPointNetDevice::DataRate", StringValue("1Gbps"));
   Config::SetDefault("ns3::PointToPointChannel::Delay", StringValue("30ms"));
-  Config::SetDefault("ns3::QueueBase::MaxSize", StringValue("6000p"));
+  Config::SetDefault("ns3::QueueBase::MaxSize", StringValue("900p"));
 
   // Read optional command-line parameters (e.g., enable visualizer with ./waf --run=<> --visualize
   CommandLine cmd;
@@ -88,7 +88,7 @@ main(int argc, char *argv[]) {
   ndn::AppHelper producerHelper("PutChunks");
   // Producer will reply to all requests starting with /prefix
   producerHelper.SetAttribute("Prefix", StringValue("/ping"));
-  producerHelper.SetAttribute("size", StringValue("2500000000"));
+  producerHelper.SetAttribute("size", StringValue("1000000000"));
   producerHelper.Install(nodes.Get(2)); // last node
 
   Simulator::Stop(Seconds(60.0));

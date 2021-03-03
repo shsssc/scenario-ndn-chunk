@@ -18,7 +18,8 @@
 #include <map>
 #include "ns3/scheduler.h"
 #include "options.h"
-#include "StatisticsCollector.h"
+#include "LatencyCollector.h"
+#include "RateCollector.h"
 
 namespace ndn {
 struct SegmentInfo {
@@ -27,7 +28,6 @@ struct SegmentInfo {
   time::nanoseconds rto;
   bool inRtQueue = false;
   bool retransmitted = false;
-  //bool gapRetransmitted = false;
   bool canTriggerTimeout = true;
   int unsatisfiedInterest = 0;
 };
@@ -57,6 +57,7 @@ public:
     m_dv->onDiscoverySuccess.connect([this](const Name &versionedName) {
       std::cerr << "Discovered version " << versionedName << std::endl;
       m_versionedName = versionedName;
+      checkRate();
       checkDelay();
       checkBalance();
       fetchLoop();
@@ -137,7 +138,8 @@ private:
   void
   handleData(const Interest &interest, const Data &data) {
     m_receivedThisRTT++;
-    //std::cerr << "data" << std::endl;
+    m_rc.receive(static_cast<int>(m_burstSz));
+    //std::cerr << m_rc.getRate() << std::endl;
     if (!m_hasLastSegment && data.getFinalBlock()) {
       m_hasLastSegment = true;
       m_lastSegment = data.getFinalBlock()->toSegment();
@@ -152,7 +154,7 @@ private:
       if (!m_inNetworkPkt[segment].retransmitted) {
         auto t = time::steady_clock::now() - m_inNetworkPkt[segment].timeSent;
         m_rttEstimator.addMeasurement(t);
-        m_sc.report(t.count()/1e4);
+        m_sc.report(t.count() / 1e4);
       }
 
       m_inNetworkPkt.erase(segment);
@@ -170,7 +172,7 @@ private:
     //we output window after change
     if (m_options.isVerbose) {
       std::cout << "ack, " << segment << "," << time::steady_clock::now().time_since_epoch().count() / 1000000 << ","
-                << m_burstSz
+                << /*m_rc.getRate()*/m_burstSz
                 << std::endl;
     }
     if (segment > m_highAcked)m_highAcked = segment;
@@ -187,10 +189,10 @@ private:
     m_inNetworkPkt[segment].unsatisfiedInterest--;
     //only use timeout on the last instance of a single segment
     if (m_inNetworkPkt[segment].unsatisfiedInterest > 0) {
-      std::cerr << "supress" << std::endl;
+      //std::cerr << "supress" << std::endl;
       return;
     }
-    if (m_inNetworkPkt.at(segment).canTriggerTimeout && decreaseWindow()) {
+    if (m_inNetworkPkt.at(segment).canTriggerTimeout && !m_inNetworkPkt.at(segment).retransmitted && decreaseWindow()) {
       for (auto &item:m_inNetworkPkt) {
         item.second.canTriggerTimeout = false;
       }
@@ -229,7 +231,7 @@ private:
     //if (m_lastDecreaseSegment >= m_highAcked) return false;
 
     if (diff < m_defaultRTT && !m_rttEstimator.hasSamples() ||
-        m_rttEstimator.hasSamples() && diff < m_rttEstimator.getSmoothedRtt())
+        m_rttEstimator.hasSamples() && diff < m_rttEstimator.getSmoothedRtt() * 1.1)
       return false;
 
     if (!m_options.simpleWindowAdj) {
@@ -241,7 +243,7 @@ private:
       }
     }
 
-    m_burstSz /= weak ? 1.33 : 2;
+    m_burstSz /= weak ? 1.1 : 2;
     m_baseBurstSz = m_burstSz;
     std::cerr << "just reduced window size to " << m_burstSz << std::endl;
     if (m_burstSz < m_minBurstSz)m_burstSz = m_minBurstSz;
@@ -360,10 +362,47 @@ private:
   }
 
   void checkDelay() {
+    return;
     m_scheduler.schedule(m_burstInterval_ms * 4, [this] { checkDelay(); });
     if (m_sc.shouldDecrease()) {
       std::cerr << "delay decrease" << std::endl;
       decreaseWindow(true);
+    }
+  }
+
+  void checkRate() {
+    m_scheduler.schedule(m_burstInterval_ms * 2, [this] { checkRate(); });
+    double observed = m_rc.getRate();
+    double theory = m_burstSz - (m_rttEstimator.getSmoothedRtt() / m_burstInterval_ms * m_options.aiStep);
+
+    /*
+    std::cerr << m_rc.getRate() << ","
+              << m_burstSz - (m_rttEstimator.getSmoothedRtt() / m_burstInterval_ms * m_options.aiStep) << std::endl;
+    */
+    //m_rc.printHistory();
+
+    if (!m_rc.hasHistory())return;
+    auto history = m_rc.getHistory();
+    double first = history.front();
+    double last = history.back();
+    if (last - first < m_options.aiStep) {
+      //if observed > burst size - RTT increase, then we are observing an increasing process.
+      if (observed > theory) {
+        return;
+      }
+      double mean = 0;
+      for (auto i : history) mean += i;
+      mean /= history.size();
+      double mae = 0;
+      for (auto i:history) {
+        mae += abs(i - mean);
+      }
+      mae /= history.size();
+      if (mae < m_options.aiStep / 2 && decreaseWindow(true)) {
+        std::cerr << mae << std::endl;
+
+      }
+
     }
   }
 
@@ -422,7 +461,8 @@ private:
   bool m_fbEnabled;
 
   //rtt
-  StatisticsCollector m_sc;
+  LatencyCollector m_sc;
+  RateCollector m_rc;
 };
 }
 

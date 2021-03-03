@@ -2,8 +2,8 @@
 // Created by developer on 2/21/21.
 //
 
-#ifndef EXTENSIONS_STATISTICSCOLLECTOR_H
-#define EXTENSIONS_STATISTICSCOLLECTOR_H
+#ifndef EXTENSIONS_LATENCYCOLLECTOR_H
+#define EXTENSIONS_LATENCYCOLLECTOR_H
 
 #include <string>
 #include "ns3/ndnSIM/ndn-cxx/face.hpp"
@@ -20,7 +20,7 @@
 #include "options.h"
 
 
-class StatisticsCollector {
+class LatencyCollector {
 
   uint32_t averageInterval = 128;
   uint32_t history = 24;
@@ -29,7 +29,7 @@ class StatisticsCollector {
   std::list<uint32_t> statsList;
   bool hasNotChecked;
 public:
-  StatisticsCollector() {
+  LatencyCollector() {
     hasNotChecked = true;
   }
 
@@ -82,4 +82,4 @@ public:
 
 };
 
-#endif //EXTENSIONS_STATISTICSCOLLECTOR_H
+#endif //EXTENSIONS_LATENCYCOLLECTOR_H
