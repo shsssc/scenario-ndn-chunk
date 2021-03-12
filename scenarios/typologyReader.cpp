@@ -14,8 +14,7 @@
 namespace ns3 {
 
 int
-main(int argc, char* argv[])
-{
+main(int argc, char *argv[]) {
   bool nullmsg = false;
 
   // Read optional command-line parameters (e.g., enable visualizer with ./waf --run=<> --visualize
@@ -60,32 +59,36 @@ main(int argc, char* argv[])
 
   Ptr<Node> producer1 = Names::Find<Node>("Dst1");
   Ptr<Node> producer2 = Names::Find<Node>("Dst2");
-  ndn::AppHelper consumerHelper("CatChunks");
-  ndn::AppHelper consumerHelper1("CatChunks");
+  ndn::AppHelper consumerHelper("NetBLT");
+  ndn::AppHelper consumerHelper1("NetBLT");
 
   // on the first consumer node install a Consumer application
   // that will express interests in /dst1 namespace
   consumerHelper.SetAttribute("Prefix", StringValue("/dst1"));
-  consumerHelper.Install(consumer1);
-  if (systemId == 0){
+  if (systemId == 0) {
+    consumerHelper.SetAttribute("logfile", StringValue("consumer0.log"));
     ndn::L3RateTracer::Install(consumer1, "consumer1.txt", Seconds(0.2));
   }
+  auto app = consumerHelper.Install(consumer1);
+  app.Start(Seconds(2));
 
   // on the second consumer node install a Consumer application
   // that will express interests in /dst2 namespace
   consumerHelper1.SetAttribute("Prefix", StringValue("/dst2"));
-  consumerHelper1.Install(consumer2);
-  if (systemId == 1){
+  if (systemId == 1) {
+    consumerHelper1.SetAttribute("logfile", StringValue("consumer1.log"));
     ndn::L3RateTracer::Install(consumer2, "consumer2.txt", Seconds(0.2));
   }
+  consumerHelper1.Install(consumer2);
+
 
   ndn::AppHelper producerHelper("PutChunks");
   producerHelper.SetAttribute("Prefix", StringValue("/dst1"));
-  producerHelper.SetAttribute("size", StringValue("500000000"));
+  producerHelper.SetAttribute("size", StringValue("2000000000"));
 
   ndn::AppHelper producerHelper1("PutChunks");
   producerHelper1.SetAttribute("Prefix", StringValue("/dst2"));
-  producerHelper1.SetAttribute("size", StringValue("500000000"));
+  producerHelper1.SetAttribute("size", StringValue("2000000000"));
 
   // Register /dst1 prefix with global routing controller and
   // install producer that will satisfy Interests in /dst1 namespace
@@ -106,7 +109,7 @@ main(int argc, char* argv[])
 
   Simulator::Run();
   MpiInterface::Disable();
-  std::cerr << "end" <<std::endl;
+  std::cerr << "end" << std::endl;
   Simulator::Destroy();
 
   return 0;
@@ -115,7 +118,6 @@ main(int argc, char* argv[])
 } // namespace ns3
 
 int
-main(int argc, char* argv[])
-{
+main(int argc, char *argv[]) {
   return ns3::main(argc, argv);
 }

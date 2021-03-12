@@ -6,6 +6,7 @@
 #include "NetBLTApp.h"
 #include <memory>
 #include <strstream>
+#include <unistd.h>
 
 namespace ns3 {
 namespace ndn {
@@ -16,10 +17,12 @@ public:
   static TypeId
   GetTypeId() {
     static TypeId tid = TypeId("NetBLT")
-       .SetParent<Application>()
-       .AddConstructor<NetBLT>().
-          AddAttribute("Prefix", "Prefix", StringValue("/"),
-                       MakeStringAccessor(&NetBLT::m_prefix), MakeStringChecker());
+            .SetParent<Application>()
+            .AddConstructor<NetBLT>()
+            .AddAttribute("Prefix", "Prefix", StringValue("/"),
+                          MakeStringAccessor(&NetBLT::m_prefix), MakeStringChecker())
+            .AddAttribute("logfile", "logfile", StringValue(""),
+                          MakeStringAccessor(&NetBLT::m_logfile), MakeStringChecker());
     return tid;
   }
 
@@ -28,7 +31,14 @@ protected:
   void
   StartApplication() override {
     // Create an instance of the app, and passing the dummy version of KeyChain (no real signing)
+    if (!m_logfile.empty()) {
+      int fd = open(m_logfile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0666);
+      close(STDOUT_FILENO);
+      dup(fd);
+    }
+
     m_instance = std::make_unique<::ndn::NetBLTApp>(m_prefix);
+
     m_instance->run();
   }
 
@@ -41,6 +51,7 @@ protected:
 private:
   std::unique_ptr<::ndn::NetBLTApp> m_instance;
   std::string m_prefix;
+  std::string m_logfile;
 };
 }
 } // namespace ns3

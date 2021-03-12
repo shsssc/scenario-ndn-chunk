@@ -35,7 +35,8 @@ struct SegmentInfo {
 class NetBLTApp {
 public:
   explicit NetBLTApp(std::string s) : m_nextSegment(0), m_prefix(std::move(s)),
-                                      m_hasLastSegment(false), m_burstSz(100), m_minBurstSz(1), m_lastDecrease(),
+                                      m_hasLastSegment(false), m_burstSz(100), m_minBurstSz(1),
+                                      m_lastDecrease(),
                                       m_burstInterval_ms(5), m_SOSSz(10000), m_defaultRTT(140),
                                       m_nextToPrint(0), m_bytesTransfered(0),
                                       m_retransmissionCount(0), m_startTime(), m_lastSegment(0),
@@ -61,6 +62,7 @@ public:
       checkDelay();
       checkBalance();
       fetchLoop();
+      checkRto();
     });
     m_dv->onDiscoveryFailure.connect([](const std::string &msg) {
       std::cout << msg;
@@ -71,6 +73,39 @@ public:
 
 
 private:
+
+  void checkRto() {
+
+    bool shouldDecreaseWindow = false;
+    for (auto &entry : m_inNetworkPkt) {
+      SegmentInfo &segInfo = entry.second;
+      if (!segInfo.inRtQueue) { // skip segments already in the retx queue
+        auto timeElapsed = time::steady_clock::now() - segInfo.timeSent;
+        if (timeElapsed > segInfo.rto) { // timer expired?
+          if (segInfo.canTriggerTimeout) shouldDecreaseWindow = true;
+          std::cout << "timeout, " << entry.first << ","
+                    << time::steady_clock::now().time_since_epoch().count() / 1000000
+                    << ","
+                    << m_burstSz
+                    << std::endl;
+          retransmit(entry.first);
+        }
+      }
+    }
+    if (shouldDecreaseWindow /*&& decreaseWindow()*/) {
+      std::cerr << "rtoTimeout" << std::endl;
+      for (auto &entry:m_inNetworkPkt) {
+        //we disqualify all outstanding packet at a drop event to cause another window decrease.
+        //They are not part of the "adjustment result"
+        //They will be requalified if they time out and get send
+        entry.second.canTriggerTimeout = false;
+      }
+    }
+
+    // schedule the next check after predefined interval
+    m_scheduler.schedule(m_options.rtoCheckInterval, [this] { checkRto(); });
+  }
+
   /**
    * express next interest
    * @return true if can continue to request more, false if cannot continue since bound reached
@@ -100,17 +135,18 @@ private:
             .setName(Name(m_versionedName).appendSegment(segToFetch))
             .setCanBePrefix(false)
             .setMustBeFresh(true)
-            .setInterestLifetime(time::milliseconds(1000));
-    if (m_rttEstimator.hasSamples()) {
-      interest.setInterestLifetime(
-              time::milliseconds(m_rttEstimator.getEstimatedRto().count() / 1000000));
-    }
+            .setInterestLifetime(time::milliseconds(4000));
+    //if (m_rttEstimator.hasSamples()) {
+    //  interest.setInterestLifetime(
+    //          time::milliseconds(m_rttEstimator.getEstimatedRto().count() / 1000000));
+    //}
     //make sure we do not have one already in flight
     auto now = time::steady_clock::now();
     SegmentInfo &tmp = m_inNetworkPkt[segToFetch];
     tmp.timeSent = now;
     tmp.unsatisfiedInterest++;
     tmp.canTriggerTimeout = true;
+    tmp.rto = m_rttEstimator.getEstimatedRto();
     m_face.expressInterest(interest,
                            bind(&NetBLTApp::handleData, this, _1, _2),
                            bind(&NetBLTApp::handleNack, this, _1, _2),
@@ -128,11 +164,13 @@ private:
 
   void fetchLoop() {
     if (finished()) return printStats();
-    for (uint32_t i = 0; i < m_burstSz; i++) {
-      if (!expressOneInterest())break;
-    }
+    //for (uint32_t i = 0; i < m_burstSz; i++) {
+    //  if (!expressOneInterest())break;
+    //}
+    expressOneInterest();
     //ns3::Simulator::Schedule(ns3::MilliSeconds(m_burstInterval_ms), &NetBLTApp::fetchLoop, this);
-    m_scheduler.schedule(m_burstInterval_ms, [this] { fetchLoop(); });
+    m_scheduler.schedule(time::microseconds((unsigned) (m_burstInterval_ms.count() * 1000 / m_burstSz)),
+                         [this] { fetchLoop(); });
   }
 
   void
@@ -172,7 +210,7 @@ private:
     //we output window after change
     if (m_options.isVerbose) {
       std::cout << "ack, " << segment << "," << time::steady_clock::now().time_since_epoch().count() / 1000000 << ","
-                << /*m_rc.getRate()*/m_burstSz
+                << m_rc.getRate() //m_burstSz
                 << std::endl;
     }
     if (segment > m_highAcked)m_highAcked = segment;
@@ -192,7 +230,8 @@ private:
       //std::cerr << "supress" << std::endl;
       return;
     }
-    if (m_inNetworkPkt.at(segment).canTriggerTimeout && !m_inNetworkPkt.at(segment).retransmitted && decreaseWindow()) {
+    if (m_inNetworkPkt.at(segment).canTriggerTimeout &&
+        !m_inNetworkPkt.at(segment).retransmitted /*&& decreaseWindow()*/) {
       for (auto &item:m_inNetworkPkt) {
         item.second.canTriggerTimeout = false;
       }
@@ -204,9 +243,7 @@ private:
                 << m_burstSz
                 << std::endl;
     }
-    //std::cerr << interest.getName()[-1].toSegment();
 
-    //do not retransmit if already detected it.
     retransmit(segment);
   }
 
@@ -243,7 +280,7 @@ private:
       }
     }
 
-    m_burstSz /= weak ? 1.1 : 2;
+    m_burstSz /= weak ? 1.5 : 2;
     m_baseBurstSz = m_burstSz;
     std::cerr << "just reduced window size to " << m_burstSz << std::endl;
     if (m_burstSz < m_minBurstSz)m_burstSz = m_minBurstSz;
@@ -293,7 +330,7 @@ private:
     //}
 
     //always retransmit
-    const uint32_t waitReorder = 7;
+    const uint32_t waitReorder = 4;
     bool shouldRetransmit = segment > waitReorder && m_inNetworkPkt.find(segment - waitReorder) != m_inNetworkPkt.end();
     for (int i = segment; i > segment - waitReorder && shouldRetransmit; i--) {
       //recent 5 must all be ready
@@ -304,6 +341,7 @@ private:
          i >= segment - waitReorder - m_burstSz && m_inNetworkPkt.find(i) != m_inNetworkPkt.end(); i--) {
       retransmit(i);
       if (m_inNetworkPkt.at(i).canTriggerTimeout && decreaseWindow()) {
+        std::cerr << "FRT" << std::endl;
         for (auto &item:m_inNetworkPkt) {
           item.second.canTriggerTimeout = false;
         }
@@ -371,22 +409,28 @@ private:
   }
 
   void checkRate() {
-    m_scheduler.schedule(m_burstInterval_ms * 2, [this] { checkRate(); });
+    if (finished())return;
+    m_scheduler.schedule(m_burstInterval_ms, [this] { checkRate(); });
+    if (m_rc.getHistory().size() < 10) return;
     double observed = m_rc.getRate();
-    double theory = m_burstSz - (m_rttEstimator.getSmoothedRtt() / m_burstInterval_ms * m_options.aiStep);
+    double theory = m_burstSz - (m_rttEstimator.getSmoothedRtt() * 1.05 / m_burstInterval_ms * m_options.aiStep);
 
-    /*
-    std::cerr << m_rc.getRate() << ","
-              << m_burstSz - (m_rttEstimator.getSmoothedRtt() / m_burstInterval_ms * m_options.aiStep) << std::endl;
-    */
+    //std::cerr << m_rc.getRate() << ","
+    //          << m_burstSz - (m_rttEstimator.getSmoothedRtt() / m_burstInterval_ms * m_options.aiStep) << std::endl;
+    if (observed < theory - 1 /* && observed < theory - 2 * m_rc.getVar()*/ ) {
+      std::cerr << m_rttEstimator.getSmoothedRtt().count() / 1e6 << std::endl;
+      std::cerr << m_rc.getRate() << "," << m_rc.getVar() << " and theory->" << theory << std::endl;
+      decreaseWindow(true);
+    }
+    return;
     //m_rc.printHistory();
 
     if (!m_rc.hasHistory())return;
     auto history = m_rc.getHistory();
     double first = history.front();
     double last = history.back();
-    if (last - first < m_options.aiStep) {
-      //if observed > burst size - RTT increase, then we are observing an increasing process.
+    if (last - first < m_options.aiStep && last - first > 0) {
+      //if observed > burst size - RTT , no point to decrease
       if (observed > theory) {
         return;
       }

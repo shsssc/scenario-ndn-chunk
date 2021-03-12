@@ -35,7 +35,7 @@ void ndn::NetBLTApp::printStats() {
             << "Segments received: " << m_lastSegment + 1 << "\n" //todo this could be bad
             << "Transferred size: " << m_bytesTransfered / 1e3 << " kB" << "\n"
             << "Goodput: " << formatThroughput(throughput) << "\n"
-            << "Retransmission: " <<m_retransmissionCount <<"\n";
+            << "Retransmission: " << m_retransmissionCount << "\n" << std::endl;
 }
 
 bool ndn::NetBLTApp::finished() const {

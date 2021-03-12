@@ -25,17 +25,21 @@ class RateCollector {
   ndn::time::steady_clock::TimePoint m_startTime;
   bool started = false;
   double rate;
+  double var;
   std::list<double> rate_history;
-  int maxHistory = 10;
+  int maxHistory = 25;
+
 public:
   RateCollector() {
     receiveInx = 0;
-    receiveInterval = 300;
+    receiveInterval = 5;
     rate = 0;
+    var = 0;
   }
 
   void receive(int sendingRate) {
-    receiveInterval = sendingRate * 1;
+    //todo
+    //receiveInterval = sendingRate * 1;
     if (!started) {
       started = true;
       m_startTime = ndn::time::steady_clock::now();
@@ -45,20 +49,27 @@ public:
     receiveInx++;
     if (receiveInx >= receiveInterval) {
       double alpha = 0.875;
-      double tmprate = receiveInx * 1.0 / ((ndn::time::steady_clock::now() - m_startTime).count() / 1e9);
+      double beta = 0.75;
+      auto timeDiff = ndn::time::steady_clock::now() - m_startTime;
+      double tmprate = receiveInx * 1.0 / (timeDiff.count() / 1e9);
       tmprate = tmprate / 1000 * 5;
       rate_history.push_back(tmprate);
       while (rate_history.size() > maxHistory) {
         rate_history.pop_front();
       }
       rate = rate * alpha + tmprate * (1 - alpha);
+      var = var * beta + abs(tmprate - rate) * (1 - beta);
       receiveInx = 0;
-      started = false;
+      m_startTime = ndn::time::steady_clock::now();
     }
   }
 
   double getRate() const {
     return rate;
+  }
+
+  double getVar() const {
+    return var;
   }
 
   std::list<double> getHistory() {
@@ -69,7 +80,7 @@ public:
     return rate_history.size() == maxHistory;
   }
 
-  double printHistory() {
+  void printHistory() {
     std::cerr << '[';
     for (auto i : rate_history) {
       std::cerr << (int) i << ",";

@@ -57,7 +57,7 @@ main(int argc, char *argv[]) {
   // setting default parameters for PointToPoint links and channels
   Config::SetDefault("ns3::PointToPointNetDevice::DataRate", StringValue("1Gbps"));
   Config::SetDefault("ns3::PointToPointChannel::Delay", StringValue("30ms"));
-  Config::SetDefault("ns3::QueueBase::MaxSize", StringValue("9000p"));
+  Config::SetDefault("ns3::QueueBase::MaxSize", StringValue("15000p"));
 
   bool nullmsg = false;
 
@@ -108,7 +108,7 @@ main(int argc, char *argv[]) {
   ndn::AppHelper consumerHelper("NetBLT");
   // Consumer will request /prefix/0, /prefix/1, ...
   consumerHelper.SetAttribute("Prefix", StringValue("/ping"));
-
+  consumerHelper.SetAttribute("logfile",StringValue("consumer_single.log"));
   auto apps = consumerHelper.Install(node1);
   apps.Start(Seconds(1.0));
   apps.Stop(Seconds(60.0)); // stop the consumer app at 10 seconds mark// first node
@@ -121,7 +121,7 @@ main(int argc, char *argv[]) {
   ndn::AppHelper producerHelper("PutChunks");
   // Producer will reply to all requests starting with /prefix
   producerHelper.SetAttribute("Prefix", StringValue("/ping"));
-  producerHelper.SetAttribute("size", StringValue("4000000000"));
+  producerHelper.SetAttribute("size", StringValue("1500000000"));
   if (systemId == 2 || systemId == 1 || systemId == 0) {
 
     producerHelper.Install(node3); // last node
