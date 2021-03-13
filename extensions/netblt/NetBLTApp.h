@@ -410,11 +410,35 @@ private:
 
   void checkRate() {
     if (finished())return;
-    m_scheduler.schedule(m_burstInterval_ms, [this] { checkRate(); });
+    static std::list<bool> h;
+    static const unsigned limit = 30;
+    static const unsigned interval = 8;
+
+    m_scheduler.schedule(time::microseconds(interval * 1000 / limit), [this] { checkRate(); });
     if (m_rc.getHistory().size() < 10) return;
     double observed = m_rc.getRate();
     double theory = m_burstSz - (m_rttEstimator.getSmoothedRtt() * 1.05 / m_burstInterval_ms * m_options.aiStep);
 
+    h.push_back(observed < theory - .3);
+    while (h.size() > limit) {
+      h.pop_front();
+    }
+
+    if (h.size() < limit) return;
+    bool shouldReduce = true;
+    for (auto i : h) {
+      if (!i) shouldReduce = false;
+    }
+    if (shouldReduce) {
+      std::cerr << m_rc.getRate() << "," << m_rc.getVar() << " and theory->" << theory << std::endl;
+      decreaseWindow(true);
+    }
+    return;
+
+    //todo
+    /*
+     * variance vs sending rate vs numsample
+     */
     //std::cerr << m_rc.getRate() << ","
     //          << m_burstSz - (m_rttEstimator.getSmoothedRtt() / m_burstInterval_ms * m_options.aiStep) << std::endl;
     if (observed < theory - 1 /* && observed < theory - 2 * m_rc.getVar()*/ ) {

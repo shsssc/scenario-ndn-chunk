@@ -38,7 +38,6 @@ public:
   }
 
   void receive(int sendingRate) {
-    //todo
     //receiveInterval = sendingRate * 1;
     if (!started) {
       started = true;
