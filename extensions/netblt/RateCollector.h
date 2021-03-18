@@ -18,6 +18,7 @@
 #include <map>
 #include "ns3/scheduler.h"
 #include "options.h"
+#include "cmath"
 
 class RateCollector {
   int receiveInx;
@@ -27,7 +28,8 @@ class RateCollector {
   double rate;
   double var;
   std::list<double> rate_history;
-  int maxHistory = 25;
+  int maxHistory = 32;
+  double alpha = 0.875;
 
 public:
   RateCollector() {
@@ -47,7 +49,10 @@ public:
     }
     receiveInx++;
     if (receiveInx >= receiveInterval) {
-      double alpha = 0.875;
+      //double alpha = 0.92;
+      const double targetWeight = 0.85;
+      const double intervalMs = 2.0;
+      alpha = pow(targetWeight, 1.0 / (intervalMs / 5 * sendingRate / receiveInterval));
       double beta = 0.75;
       auto timeDiff = ndn::time::steady_clock::now() - m_startTime;
       double tmprate = receiveInx * 1.0 / (timeDiff.count() / 1e9);
@@ -56,7 +61,11 @@ public:
       while (rate_history.size() > maxHistory) {
         rate_history.pop_front();
       }
-      rate = rate * alpha + tmprate * (1 - alpha);
+      if (rate < .5) rate = tmprate;
+      else {
+        rate = rate * alpha + tmprate * (1 - alpha);
+
+      }
       var = var * beta + abs(tmprate - rate) * (1 - beta);
       receiveInx = 0;
       m_startTime = ndn::time::steady_clock::now();

@@ -22,8 +22,8 @@
 
 class LatencyCollector {
 
-  uint32_t averageInterval = 128;
-  uint32_t history = 24;
+  uint32_t averageInterval = 64;
+  uint32_t history = 30;
   uint32_t increaseThreshold = 12;
   std::list<uint32_t> tmpList;
   std::list<uint32_t> statsList;

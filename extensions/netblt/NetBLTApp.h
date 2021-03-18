@@ -410,16 +410,20 @@ private:
 
   void checkRate() {
     if (finished())return;
-    static std::list<bool> h;
-    static const unsigned limit = 30;
-    static const unsigned interval = 8;
+    // static std::list<bool> h;
+    //static const unsigned limit = 30;
+    //static const unsigned interval = 8;
 
-    m_scheduler.schedule(time::microseconds(interval * 1000 / limit), [this] { checkRate(); });
-    if (m_rc.getHistory().size() < 10) return;
+    m_scheduler.schedule(time::microseconds(1500), [this] { checkRate(); });
     double observed = m_rc.getRate();
-    double theory = m_burstSz - (m_rttEstimator.getSmoothedRtt() * 1.05 / m_burstInterval_ms * m_options.aiStep);
+    double theory = m_burstSz -
+                    ((m_sc.hasData() ? time::milliseconds(m_sc.minInterval() / 100) : m_rttEstimator.getSmoothedRtt())
+                     / m_burstInterval_ms
+                     * m_options.aiStep);
 
-    h.push_back(observed < theory - .3);
+    if (m_rc.getHistory().size() < 2) return;
+
+    /*h.push_back(observed < theory - .3);
     while (h.size() > limit) {
       h.pop_front();
     }
@@ -434,6 +438,7 @@ private:
       decreaseWindow(true);
     }
     return;
+    */
 
     //todo
     /*
@@ -441,8 +446,8 @@ private:
      */
     //std::cerr << m_rc.getRate() << ","
     //          << m_burstSz - (m_rttEstimator.getSmoothedRtt() / m_burstInterval_ms * m_options.aiStep) << std::endl;
-    if (observed < theory - 1 /* && observed < theory - 2 * m_rc.getVar()*/ ) {
-      std::cerr << m_rttEstimator.getSmoothedRtt().count() / 1e6 << std::endl;
+    if (observed < theory - .5 /* && observed < theory - 2 * m_rc.getVar()*/ ) {
+      std::cerr << time::milliseconds(m_sc.minInterval() / 100) << std::endl;
       std::cerr << m_rc.getRate() << "," << m_rc.getVar() << " and theory->" << theory << std::endl;
       decreaseWindow(true);
     }
