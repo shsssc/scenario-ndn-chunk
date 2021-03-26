@@ -41,7 +41,7 @@ public:
                                       m_nextToPrint(0), m_bytesTransfered(0),
                                       m_retransmissionCount(0), m_startTime(), m_lastSegment(0),
                                       m_frtCounter(0), m_fbEnabled(false), m_highRequested(0),
-                                      m_lastDecreaseSegment(0), m_highAcked(0), m_sc(),
+                                      m_lastProbeSegment(0), m_highAcked(0), m_sc(), m_adjustmentState(0),
                                       m_scheduler(m_face.getIoService()) {
     m_dv = make_unique<chunks::DiscoverVersion>(m_face, m_prefix, m_optVD);
     m_SOSSz = m_options.m_SOSSz;
@@ -58,11 +58,12 @@ public:
     m_dv->onDiscoverySuccess.connect([this](const Name &versionedName) {
       std::cerr << "Discovered version " << versionedName << std::endl;
       m_versionedName = versionedName;
-      checkRate();
+      //checkRate();
       checkDelay();
       checkBalance();
       fetchLoop();
       checkRto();
+      rateStateMachine();
     });
     m_dv->onDiscoveryFailure.connect([](const std::string &msg) {
       std::cout << msg;
@@ -103,7 +104,8 @@ private:
     }
 
     // schedule the next check after predefined interval
-    m_scheduler.schedule(m_options.rtoCheckInterval, [this] { checkRto(); });
+    if (!finished())
+      m_scheduler.schedule(m_options.rtoCheckInterval, [this] { checkRto(); });
   }
 
   /**
@@ -206,7 +208,6 @@ private:
     //std::cerr << "data buffer sz" << m_dataBuffer.size() << "rtq sz" << retransmissionPQ.size() << "set sz"
     //          << m_inNetworkPkt.size() << std::endl;
     outputData();
-    increaseWindow();
     //we output window after change
     if (m_options.isVerbose) {
       std::cout << "ack, " << segment << "," << time::steady_clock::now().time_since_epoch().count() / 1000000 << ","
@@ -265,7 +266,7 @@ private:
     auto now = time::steady_clock::now();
     auto diff = now - m_lastDecrease;
     //only decrease once in one rtt.
-    //if (m_lastDecreaseSegment >= m_highAcked) return false;
+    //if (m_lastProbeSegment >= m_highAcked) return false;
 
     if (diff < m_defaultRTT && !m_rttEstimator.hasSamples() ||
         m_rttEstimator.hasSamples() && diff < m_rttEstimator.getSmoothedRtt() * 1.1)
@@ -285,29 +286,66 @@ private:
     std::cerr << "just reduced window size to " << m_burstSz << std::endl;
     if (m_burstSz < m_minBurstSz)m_burstSz = m_minBurstSz;
     m_lastDecrease = now;
-    m_lastDecreaseSegment = m_highRequested + 1;
+    m_lastProbeSegment = m_highRequested + 1;
     return true;
   }
 
-  void increaseWindow() {
-    if (!m_options.simpleWindowAdj) {
-      auto now = time::steady_clock::now();
-      auto diff = now - m_lastDecrease;
-      m_burstSz = diff / m_burstInterval_ms * m_options.aiStep + m_baseBurstSz;
-    } else {
-      m_burstSz += m_options.aiStep / m_burstSz;
+  void rateStateMachine() {
+    const int numStates = 15;
+    const int wait = 4;
+    if (finished()) return;
+    m_scheduler.schedule(time::microseconds(500), [this] { rateStateMachine(); });
+    if (m_lastProbeSegment >= m_highAcked) {
+      //we are waiting for the current adjustment to be measurable
+      m_rate_history.push_back(m_rc.getRate());
+      if (m_rate_history.size() > numStates - wait)m_rate_history.pop_front();
+      if (m_rate_history.size() < numStates - wait) return;
+      double avg = 0;
+      for (auto i :m_rate_history) {
+        avg += i;
+      }
+      avg /= m_rate_history.size();
+      if (avg < m_last_bs - 0.3) {
+        //sending rate is below previous sending rate
+        m_lastProbeSegment = m_highRequested + 1;
+        m_rate_history.clear();
+        //Adjustment gets back
+        m_last_bs = -1;//we disable this feature since we do not have good assumption
+        m_burstSz /= 1.5;
+        std::cerr << "decrease1 at" << m_burstSz << "," << avg << ","
+                  << time::steady_clock::now().time_since_epoch().count() / 1000000 << std::endl;
+        m_adjustmentState = numStates;
+      }
+      return;
     }
+    //now we have waited 1 RTT
+    if (m_adjustmentState == 0) {
+      //probe interest is back, we are in "wait" state
+      m_adjustmentState = numStates;
+      m_rate_history.clear();
+    }
+    if (m_adjustmentState <= numStates - wait)
+      m_rate_history.push_back(m_rc.getRate());
+    m_adjustmentState--;
+    if (m_adjustmentState != 0) return;
+    //now it must be 0, we can react
+    double average = 0;
+    for (double i : m_rate_history) {
+      average += i;
+    }
+    average /= m_rate_history.size();
 
-    //std::cout << now <<"\t" <<m_burstSz <<std::endl;
-    //return;
-    //slow start
-    //if (m_burstSz < 100) {
-    //  m_burstSz++;
-    //  return;
-    //}
-    //congestion avoidance
-    //m_burstSz += m_options.aiStep / m_burstSz;
-    //std::cerr <<"just increased window size" << m_burstSz<<std::endl;
+    m_lastProbeSegment = m_highRequested + 1;
+    m_rate_history.clear();
+    //Adjustment gets back
+    m_last_bs = m_burstSz;
+    if (average < m_burstSz - 0.3) {
+      m_burstSz /= 1.5;
+      m_last_bs = -1;//already bad, not reasonable to monitor the rate
+      std::cerr << "decrease at" << m_burstSz << "," << average << ","
+                << time::steady_clock::now().time_since_epoch().count() / 1000000 << std::endl;
+    } else
+      m_burstSz += m_options.aiStep * (m_rttEstimator.getSmoothedRtt() / time::milliseconds(5));
   }
 
   bool fastRetransmission(uint32_t segment) {
@@ -409,6 +447,7 @@ private:
   }
 
   void checkRate() {
+    return;
     if (finished())return;
     // static std::list<bool> h;
     //static const unsigned limit = 30;
@@ -515,7 +554,7 @@ private:
   uint32_t m_frtCounter;
   //uint32_t m_afterGap;
   uint32_t m_highRequested;
-  uint32_t m_lastDecreaseSegment;
+  uint32_t m_lastProbeSegment;
   uint32_t m_highAcked;
 
   //stats
@@ -536,6 +575,11 @@ private:
   //rtt
   LatencyCollector m_sc;
   RateCollector m_rc;
+
+  //state machine
+  int m_adjustmentState;
+  std::list<double> m_rate_history;
+  double m_last_bs;
 };
 }
 

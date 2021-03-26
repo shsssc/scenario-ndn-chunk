@@ -29,7 +29,7 @@ class RateCollector {
   double var;
   std::list<double> rate_history;
   int maxHistory = 32;
-  double alpha = 0.875;
+  double alpha = 0.6;
 
 public:
   RateCollector() {
@@ -50,8 +50,8 @@ public:
     receiveInx++;
     if (receiveInx >= receiveInterval) {
       //double alpha = 0.92;
-      const double targetWeight = 0.85;
-      const double intervalMs = 2.0;
+      const double targetWeight = 0.55;
+      const double intervalMs = 0.45;
       alpha = pow(targetWeight, 1.0 / (intervalMs / 5 * sendingRate / receiveInterval));
       double beta = 0.75;
       auto timeDiff = ndn::time::steady_clock::now() - m_startTime;
