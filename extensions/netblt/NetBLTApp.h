@@ -82,7 +82,7 @@ private:
   }
 
   void additiveIncrease() {
-    m_burstSz += m_options.aiStep * (m_rttEstimator.getSmoothedRtt() / time::milliseconds(5));
+    m_burstSz += m_options.aiStep * 8/* (m_rttEstimator.getSmoothedRtt() / time::milliseconds(5))*/;
   }
 
   void multiplitiveDecrease() {
@@ -107,7 +107,7 @@ private:
 
   void rateStateMachine() {
     const int WAIT_STATE = 0;
-    const int numStates = 15;
+    const int numStates = 20;
     const int wait = 4;
     const double tolerance = 0.5;
     if (finished()) return;

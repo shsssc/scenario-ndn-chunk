@@ -1,0 +1,28 @@
+# topo-6-node.txt
+
+router
+
+# node  comment     yPos    xPos
+Src1   NA        1       0 0
+Src2   NA        3       1 1
+Src3   NA        3       2 2
+Src4   NA        3       3 3
+Dst1   NA        1       4 4
+Dst2   NA        3       5 5
+Dst3   NA        3       6 6
+Dst4   NA        3       7 7
+Rtr1   NA        2       8 8
+Rtr2   NA        2       9 9
+
+link
+
+# srcNode   dstNode     bandwidth   metric  delay   queue
+Src1        Rtr1        1Gbps      1        55ms    1000
+Src2        Rtr1        1Gbps      1        25ms    1000
+Src3        Rtr1        1Gbps      1        15ms    1000
+Src4        Rtr1        1Gbps      1        5ms    1000
+Rtr1        Rtr2        1Gbps      1        2ms    9000
+Dst1        Rtr2        1Gbps      1        3ms    2000
+Dst2        Rtr2        1Gbps      1        3ms    2000
+Dst3        Rtr2        1Gbps      1        3ms    2000
+Dst4        Rtr2        1Gbps      1        3ms    2000
