@@ -24,6 +24,7 @@
 #include "ns3/point-to-point-module.h"
 #include "ns3/ndnSIM-module.h"
 #include "ns3/mpi-interface.h"
+#include <fcntl.h>
 
 #ifdef NS3_MPI
 #include <mpi.h>
@@ -52,12 +53,22 @@ namespace ns3 {
  *     NS_LOG=ndn.Consumer:ndn.Producer ./waf --run=ndn-simple
  */
 
+void queueSizeTrace(Ptr<Node> node) {
+  PointerValue txQueue;
+  node->GetDevice(0)->GetAttribute("TxQueue", txQueue);
+  uint32_t k = txQueue.Get<ns3::QueueBase>()->GetNPackets();
+  std::cerr << "queue size, " << k << "," << ndn::time::steady_clock::now().time_since_epoch().count() / 1000000.
+            << std::endl;
+  Simulator::Schedule(Seconds(0.001), &queueSizeTrace, node);
+
+}
+
 int
 main(int argc, char *argv[]) {
   // setting default parameters for PointToPoint links and channels
   Config::SetDefault("ns3::PointToPointNetDevice::DataRate", StringValue("1Gbps"));
-  Config::SetDefault("ns3::PointToPointChannel::Delay", StringValue("30ms"));
-  Config::SetDefault("ns3::QueueBase::MaxSize", StringValue("15000p"));
+  Config::SetDefault("ns3::PointToPointChannel::Delay", StringValue("20ms"));
+  Config::SetDefault("ns3::QueueBase::MaxSize", StringValue("10000p"));
 
   bool nullmsg = false;
 
@@ -85,6 +96,8 @@ main(int argc, char *argv[]) {
   Ptr<Node> node1 = CreateObject<Node>(0);
   Ptr<Node> node2 = CreateObject<Node>(1);
   Ptr<Node> node3 = CreateObject<Node>(2);
+
+
   //nodes.Add(node1);
   //nodes.Add(node2);
   //nodes.Add(node3);
@@ -108,7 +121,7 @@ main(int argc, char *argv[]) {
   ndn::AppHelper consumerHelper("NetBLT");
   // Consumer will request /prefix/0, /prefix/1, ...
   consumerHelper.SetAttribute("Prefix", StringValue("/ping"));
-  consumerHelper.SetAttribute("logfile",StringValue("consumer_single.log"));
+  consumerHelper.SetAttribute("logfile", StringValue("consumer_single.log"));
   auto apps = consumerHelper.Install(node1);
   apps.Start(Seconds(1.0));
   apps.Stop(Seconds(60.0)); // stop the consumer app at 10 seconds mark// first node
@@ -130,12 +143,22 @@ main(int argc, char *argv[]) {
 
   Simulator::Stop(Seconds(60.0));
   //ndn::L3RateTracer::InstallAll("rate-trace.txt", Seconds(0.2));
+
+  if (systemId == 2) {
+    int fd = open("queueTrace_single.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    close(STDERR_FILENO);
+    dup(fd);
+    std::cerr << "msg, size, time\n";
+    Simulator::Schedule(Seconds(0.05), &queueSizeTrace, node3);
+  }
+
   Simulator::Run();
   MpiInterface::Disable();
   Simulator::Destroy();
 
   return 0;
 }
+
 
 } // namespace ns3
 

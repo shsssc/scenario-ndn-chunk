@@ -56,7 +56,7 @@ Producer::Producer(const Name& prefix, KeyChain& keyChain, unsigned long long is
   if (m_options.wantShowVersion)
     std::cout << m_versionedPrefix[-1] << std::endl;
 
-  // register m_prefix without interest handler
+  // register m_prefix without interest queueSizeTrace
   m_face.registerPrefix(m_prefix, nullptr, bind(&Producer::onRegisterFailed, this, _1, _2));
 
   // match Interests whose name starts with m_versionedPrefix

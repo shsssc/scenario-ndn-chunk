@@ -5,6 +5,8 @@
 #include "ns3/ndnSIM-module.h"
 #include "model/ndn-l3-protocol.hpp"
 #include "ns3/mpi-interface.h"
+#include <unistd.h>
+#include <fcntl.h>
 
 #ifdef NS3_MPI
 #include <mpi.h>
@@ -12,6 +14,16 @@
 #error "ndn-simple-mpi scenario can be compiled only if NS3_MPI is enabled"
 #endif
 namespace ns3 {
+
+void queueSizeTrace(Ptr<Node> node) {
+  PointerValue txQueue;
+  node->GetDevice(0)->GetAttribute("TxQueue", txQueue);
+  uint32_t k = txQueue.Get<ns3::QueueBase>()->GetNPackets();
+  std::cout << "queue size, " << k << "," << ndn::time::steady_clock::now().time_since_epoch().count() / 1000000.
+            << std::endl;
+  Simulator::Schedule(Seconds(0.0005), &queueSizeTrace, node);
+
+}
 
 int
 main(int argc, char *argv[]) {
@@ -70,7 +82,7 @@ main(int argc, char *argv[]) {
     ndn::L3RateTracer::Install(consumer1, "consumer1.txt", Seconds(0.2));
   }
   auto app = consumerHelper.Install(consumer1);
-  app.Start(Seconds(2));
+  app.Start(Seconds(2.15));
 
   // on the second consumer node install a Consumer application
   // that will express interests in /dst2 namespace
@@ -79,7 +91,7 @@ main(int argc, char *argv[]) {
     consumerHelper1.SetAttribute("logfile", StringValue("consumer1.log"));
     ndn::L3RateTracer::Install(consumer2, "consumer2.txt", Seconds(0.2));
   }
-  consumerHelper1.Install(consumer2);
+  consumerHelper1.Install(consumer2).Start(Seconds(2.00));
 
 
   ndn::AppHelper producerHelper("PutChunks");
@@ -106,6 +118,13 @@ main(int argc, char *argv[]) {
   ndn::GlobalRoutingHelper::CalculateRoutes();
 
   Simulator::Stop(Seconds(120.0));
+
+  if (systemId == 5) {
+    int fd = open("queueTrace.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    close(STDOUT_FILENO);
+    dup(fd);
+    Simulator::Schedule(Seconds(0.02), &queueSizeTrace, Names::Find<Node>("Rtr2"));
+  }
 
   Simulator::Run();
   MpiInterface::Disable();

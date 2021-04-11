@@ -68,6 +68,7 @@ ndn::NetBLTApp::NetBLTApp(std::string s) : m_nextSegment(0), m_prefix(std::move(
   m_minBurstSz = m_options.m_minBurstSz;
   m_defaultRTT = m_options.m_defaultRTT;
   m_burstInterval_ms = m_options.m_burstInterval_ms;
+  std::cout << std::setprecision(10);
 }
 
 void ndn::NetBLTApp::run() {
@@ -97,7 +98,7 @@ void ndn::NetBLTApp::checkRto() {
       if (timeElapsed > segInfo.rto) { // timer expired?
         if (segInfo.canTriggerTimeout) shouldDecreaseWindow = true;
         std::cout << "timeout, " << entry.first << ","
-                  << time::steady_clock::now().time_since_epoch().count() / 1000000
+                  << time::steady_clock::now().time_since_epoch().count() / 1000000.
                   << ","
                   << m_burstSz
                   << std::endl;
@@ -162,12 +163,10 @@ bool ndn::NetBLTApp::expressOneInterest() {
                          bind(&NetBLTApp::handleNack, this, _1, _2),
                          bind(&NetBLTApp::handleTimeout, this, _1));
   if (m_options.isVerbose) {
-    std::cout << "express, " << segToFetch << "," << time::steady_clock::now().time_since_epoch().count() / 1000000
+    std::cout << "express, " << segToFetch << "," << time::steady_clock::now().time_since_epoch().count() / 1000000.
               << "," << m_burstSz
               << std::endl;
   }
-
-  m_sentThisRTT++;
   if (segToFetch > m_highRequested)m_highRequested = segToFetch;
   return true;
 }
@@ -179,12 +178,12 @@ void ndn::NetBLTApp::fetchLoop() {
   //}
   expressOneInterest();
   //ns3::Simulator::Schedule(ns3::MilliSeconds(m_burstInterval_ms), &NetBLTApp::fetchLoop, this);
-  m_scheduler.schedule(time::microseconds((unsigned) (m_burstInterval_ms.count() * 1000 / m_burstSz)),
+  m_scheduler.schedule(time::nanoseconds((unsigned) (m_burstInterval_ms.count() * 1000000 / m_burstSz)),
                        [this] { fetchLoop(); });
 }
 
 void ndn::NetBLTApp::handleData(const ndn::Interest &interest, const ndn::Data &data) {
-  m_receivedThisRTT++;
+  m_recvCount++;
   m_rc.receive(static_cast<int>(m_burstSz));
   //std::cerr << m_rc.getRate() << std::endl;
   if (!m_hasLastSegment && data.getFinalBlock()) {
@@ -217,7 +216,7 @@ void ndn::NetBLTApp::handleData(const ndn::Interest &interest, const ndn::Data &
   outputData();
   //we output window after change
   if (m_options.isVerbose) {
-    std::cout << "ack, " << segment << "," << time::steady_clock::now().time_since_epoch().count() / 1000000 << ","
+    std::cout << "ack, " << segment << "," << time::steady_clock::now().time_since_epoch().count() / 1000000. << ","
               << m_rc.getRate() //m_burstSz
               << std::endl;
   }
@@ -244,7 +243,7 @@ void ndn::NetBLTApp::handleTimeout(const ndn::Interest &interest) {
   }
 
   if (m_options.isVerbose) {
-    std::cout << "timeout, " << segment << "," << time::steady_clock::now().time_since_epoch().count() / 1000000
+    std::cout << "timeout, " << segment << "," << time::steady_clock::now().time_since_epoch().count() / 1000000.
               << ","
               << m_burstSz
               << std::endl;
@@ -272,7 +271,7 @@ bool ndn::NetBLTApp::decreaseWindow(bool weak) {
   if (diff < m_defaultRTT && !m_rttEstimator.hasSamples() ||
       m_rttEstimator.hasSamples() && diff < m_rttEstimator.getSmoothedRtt() * 1.1)
     return false;
-
+  return true;//will stop from functioning
   if (!m_options.simpleWindowAdj) {
     //this formula is experimental
     m_burstSz = diff / m_burstInterval_ms * m_options.aiStep + m_baseBurstSz;

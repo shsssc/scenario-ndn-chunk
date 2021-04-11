@@ -29,18 +29,19 @@ class RateCollector {
   double var;
   std::list<double> rate_history;
   int maxHistory = 32;
-  double alpha = 0.6;
+  double alpha = 0;
 
 public:
   RateCollector() {
     receiveInx = 0;
-    receiveInterval = 5;
+    receiveInterval = 17;
     rate = 0;
     var = 0;
   }
 
   void receive(int sendingRate) {
-    //receiveInterval = sendingRate * 1;
+   // receiveInterval = sendingRate / 2;
+    //if (receiveInterval < 3) receiveInterval = 3;
     if (!started) {
       started = true;
       m_startTime = ndn::time::steady_clock::now();
@@ -50,12 +51,12 @@ public:
     receiveInx++;
     if (receiveInx >= receiveInterval) {
       //double alpha = 0.92;
-      const double targetWeight = 0.55;
-      const double intervalMs = 0.45;
-      alpha = pow(targetWeight, 1.0 / (intervalMs / 5 * sendingRate / receiveInterval));
+      //const double targetWeight = 0.55;
+      //const double intervalMs = 0.45;
+      //alpha = pow(targetWeight, 1.0 / (intervalMs / 5 * sendingRate / receiveInterval));
       double beta = 0.75;
       auto timeDiff = ndn::time::steady_clock::now() - m_startTime;
-      double tmprate = receiveInx * 1.0 / (timeDiff.count() / 1e9);
+      double tmprate = receiveInx * 1e9 / (timeDiff.count());
       tmprate = tmprate / 1000 * 5;
       rate_history.push_back(tmprate);
       while (rate_history.size() > maxHistory) {

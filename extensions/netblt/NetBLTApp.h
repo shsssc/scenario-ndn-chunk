@@ -82,7 +82,9 @@ private:
   }
 
   void additiveIncrease() {
-    m_burstSz += m_options.aiStep * 8/* (m_rttEstimator.getSmoothedRtt() / time::milliseconds(5))*/;
+    m_burstSz +=
+            m_options.aiStep * ((m_rttEstimator.getSmoothedRtt() ) / time::milliseconds(5));
+    //m_burstSz = 134;
   }
 
   void multiplitiveDecrease() {
@@ -92,62 +94,66 @@ private:
               << time::steady_clock::now().time_since_epoch().count() / 1000000 << std::endl;
   }
 
-  double averageRate() {
-    if (m_rate_history.empty()) {
-      std::cerr << "error: no history available\n";
-      return 0;
-    }
-    double avg = 0;
-    for (auto i :m_rate_history) {
-      avg += i;
-    }
-    avg /= m_rate_history.size();
-    return avg;
+  double getRate() {
+    if (m_recvCount <= 0) return 0;
+    return m_recvCount * 1e9 * 0.005 / (time::steady_clock::now() - m_lastRecvCheckpoint).count();
+  }
+
+  void resetRate() {
+    m_recvCount = 0;
+    m_lastRecvCheckpoint = time::steady_clock::now();
   }
 
   void rateStateMachine() {
     const int WAIT_STATE = 0;
-    const int numStates = 20;
-    const int wait = 4;
-    const double tolerance = 0.5;
+    const int numStates = 120;
+    /*
+    if (m_rttEstimator.hasSamples() && m_adjustmentState == WAIT_STATE) {
+      numStates = m_rttEstimator.getSmoothedRtt() / time::microseconds(500);
+    }
+     */
+    const int wait = 5;
+    const double tolerance = 0.2;
     if (finished()) return;
-    m_scheduler.schedule(time::microseconds(500), [this] { rateStateMachine(); });
+    m_scheduler.schedule(time::microseconds(1000), [this] { rateStateMachine(); });
     if (m_lastProbeSegment >= m_highAcked) {
       //probe have not get back
-      m_rate_history.push_back(m_rc.getRate());
-      if (m_rate_history.size() > numStates - wait) m_rate_history.pop_front();//keep only last few measurements
-      if (m_rate_history.size() < numStates - wait) return;
-      double avg = averageRate();
-      if (compare(avg, m_last_bs, tolerance)) {
-        //sending rate is below previous sending rate
-        m_lastProbeSegment = m_highRequested + 1;
-        m_rate_history.clear();
-        //Adjustment gets back
-        multiplitiveDecrease();
-        m_adjustmentState = numStates;
-      }
       return;
     }
     //probe have get back
     if (m_adjustmentState == WAIT_STATE) {
       //we just get the probe
       m_adjustmentState = numStates;
-      m_rate_history.clear();//history was for prev sending rate
+      double rate = getRate();
+      std::cerr << rate << ", " << m_last_bs << std::endl;
+      if (compare(rate, m_last_bs, tolerance)) {
+        //sending rate is below previous sending rate
+        m_lastProbeSegment = m_highRequested + 1;
+        //Adjustment gets back
+        multiplitiveDecrease();
+        m_adjustmentState = numStates;
+        resetRate();
+        return;
+      }
     }
-    if (m_adjustmentState <= numStates - wait) {
-      //we have waited to get steady measurement
-      m_rate_history.push_back(m_rc.getRate());
+    if (m_adjustmentState == numStates - wait) {
+      //wait for queue drop
+      resetRate();
     }
+
     m_adjustmentState--;//goto next state
     if (m_adjustmentState != WAIT_STATE) return;
     //we conducted enough measurement to make a decision
-    double average = averageRate();
 
     m_lastProbeSegment = m_highRequested + 1;
-    m_rate_history.clear();
     //Adjustment gets back
     m_last_bs = m_burstSz;
-    if (compare(average, m_burstSz, tolerance)) {
+
+    double rate = getRate();
+    std::cerr << rate << ", " << m_burstSz << std::endl;
+    resetRate();
+
+    if (compare(rate, m_burstSz, tolerance)) {
       multiplitiveDecrease();
     } else
       additiveIncrease();
@@ -203,16 +209,15 @@ private:
 
 
   //experimental: flow balance
-  uint32_t m_receivedThisRTT;
-  uint32_t m_sentThisRTT;
-
+  uint32_t m_recvCount;
+  time::steady_clock::TimePoint m_lastRecvCheckpoint;
   //rtt
   LatencyCollector m_sc;
   RateCollector m_rc;
 
   //state machine
   int m_adjustmentState;
-  std::list<double> m_rate_history;
+  //std::list<double> m_rate_history;
   double m_last_bs;
 };
 }
