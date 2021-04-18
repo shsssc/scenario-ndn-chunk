@@ -50,7 +50,7 @@ public:
     security::SigningInfo signingInfo;
     time::milliseconds freshnessPeriod{10000};
     size_t maxSegmentSize = MAX_NDN_PACKET_SIZE >> 1;
-    bool isQuiet = false;
+    bool isQuiet = true;
     bool isVerbose = false;
     bool wantShowVersion = false;
   };

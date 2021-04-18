@@ -66,8 +66,8 @@ void queueSizeTrace(Ptr<Node> node) {
 int
 main(int argc, char *argv[]) {
   // setting default parameters for PointToPoint links and channels
-  Config::SetDefault("ns3::PointToPointNetDevice::DataRate", StringValue("1Gbps"));
-  Config::SetDefault("ns3::PointToPointChannel::Delay", StringValue("20ms"));
+  Config::SetDefault("ns3::PointToPointNetDevice::DataRate", StringValue("0.5Gbps"));
+  Config::SetDefault("ns3::PointToPointChannel::Delay", StringValue("15ms"));
   Config::SetDefault("ns3::QueueBase::MaxSize", StringValue("10000p"));
 
   bool nullmsg = false;
@@ -124,7 +124,7 @@ main(int argc, char *argv[]) {
   consumerHelper.SetAttribute("logfile", StringValue("consumer_single.log"));
   auto apps = consumerHelper.Install(node1);
   apps.Start(Seconds(1.0));
-  apps.Stop(Seconds(60.0)); // stop the consumer app at 10 seconds mark// first node
+  apps.Stop(Seconds(120.0));
 
 
 
@@ -141,7 +141,7 @@ main(int argc, char *argv[]) {
   }
 
 
-  Simulator::Stop(Seconds(60.0));
+  Simulator::Stop(Seconds(120.0));
   //ndn::L3RateTracer::InstallAll("rate-trace.txt", Seconds(0.2));
 
   if (systemId == 2) {

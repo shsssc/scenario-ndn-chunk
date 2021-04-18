@@ -82,7 +82,7 @@ main(int argc, char *argv[]) {
     ndn::L3RateTracer::Install(consumer1, "consumer1.txt", Seconds(0.2));
   }
   auto app = consumerHelper.Install(consumer1);
-  app.Start(Seconds(2.15));
+  app.Start(Seconds(2.240));
 
   // on the second consumer node install a Consumer application
   // that will express interests in /dst2 namespace
@@ -96,11 +96,11 @@ main(int argc, char *argv[]) {
 
   ndn::AppHelper producerHelper("PutChunks");
   producerHelper.SetAttribute("Prefix", StringValue("/dst1"));
-  producerHelper.SetAttribute("size", StringValue("2000000000"));
+  producerHelper.SetAttribute("size", StringValue("1000000000"));
 
   ndn::AppHelper producerHelper1("PutChunks");
   producerHelper1.SetAttribute("Prefix", StringValue("/dst2"));
-  producerHelper1.SetAttribute("size", StringValue("2000000000"));
+  producerHelper1.SetAttribute("size", StringValue("1000000000"));
 
   // Register /dst1 prefix with global routing controller and
   // install producer that will satisfy Interests in /dst1 namespace
@@ -123,6 +123,7 @@ main(int argc, char *argv[]) {
     int fd = open("queueTrace.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);
     close(STDOUT_FILENO);
     dup(fd);
+    std::cerr << "msg, size, time\n";
     Simulator::Schedule(Seconds(0.02), &queueSizeTrace, Names::Find<Node>("Rtr2"));
   }
 

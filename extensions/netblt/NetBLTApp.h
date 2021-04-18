@@ -83,7 +83,7 @@ private:
 
   void additiveIncrease() {
     m_burstSz +=
-            m_options.aiStep * ((m_rttEstimator.getSmoothedRtt() ) / time::milliseconds(5));
+            m_options.aiStep * ((m_rttEstimator.getSmoothedRtt()) / time::milliseconds(5));
     //m_burstSz = 134;
   }
 
@@ -92,6 +92,62 @@ private:
     m_last_bs = -1;//already bad recv rate, not reasonable to monitor the rate
     std::cerr << "decrease at" << m_burstSz << "," << "" << ","
               << time::steady_clock::now().time_since_epoch().count() / 1000000 << std::endl;
+  }
+
+  void cubicIncrease() {
+    constexpr double CUBIC_C = 0.1;
+    // Slow start phase
+    if (m_burstSz < m_options.initSsthresh) {
+      m_burstSz *= 2;
+    }
+      // Congestion avoidance phase
+    else {
+      // If wmax is still 0, set it to the current cwnd. Usually unnecessary,
+      // if m_ssthresh is large enough.
+      if (m_wmax < m_options.initCwnd) {
+        m_wmax = m_burstSz;
+      }
+
+      // 1. Time since last congestion event in seconds
+      const double t = (time::steady_clock::now() - m_lastDecrease).count() / 1e9;
+
+      // 2. Time it takes to increase the window to m_wmax = the cwnd right before the last
+      // window decrease.
+      // K = cubic_root(wmax*(1-beta_cubic)/C) (Eq. 2)
+      const double k = std::cbrt(m_wmax * (1 - m_options.cubicBeta) / CUBIC_C);
+
+      // 3. Target: W_cubic(t) = C*(t-K)^3 + wmax (Eq. 1)
+      const double wCubic = CUBIC_C * std::pow(t - k + m_rttEstimator.getSmoothedRtt().count() / 1e9, 3) + m_wmax;
+      //std::cerr << t - k << ",!" << m_wmax << std::endl;
+      // 4. Estimate of Reno Increase (Eq. 4)
+      //const double rtt = m_rttEstimator.getSmoothedRtt().count() / 1e9;
+      //const double wEst = 0;
+
+      // Actual adaptation
+      //double cubicIncrement = wCubic - m_burstSz;
+      // Cubic increment must be positive
+      // Note: This change is not part of the RFC, but I added it to improve performance.
+      //cubicIncrement = std::max(0.0, cubicIncrement);
+
+      m_burstSz = wCubic;
+    }
+  }
+
+  void cubicDecrease() {
+    m_last_bs = -1;
+    constexpr double CUBIC_C = 0.4;
+    if (m_options.enableFastConv && m_burstSz < m_lastWmax) {
+      m_lastWmax = m_burstSz;
+      m_wmax = m_burstSz * (1.0 + m_options.cubicBeta) / 2.0;
+      std::cerr << "!!!!!!!!!!!";
+    } else {
+      // Save old cwnd as wmax
+      m_lastWmax = m_burstSz;
+      m_wmax = m_burstSz;
+    }
+    //std::cerr << ",!" << m_wmax << std::endl;
+    m_burstSz = std::max(1., m_burstSz * m_options.cubicBeta);
+    m_lastDecrease = time::steady_clock::now();
   }
 
   double getRate() {
@@ -106,12 +162,13 @@ private:
 
   void rateStateMachine() {
     const int WAIT_STATE = 0;
-    const int numStates = 120;
-    /*
+    int numStates = 60;
+
     if (m_rttEstimator.hasSamples() && m_adjustmentState == WAIT_STATE) {
-      numStates = m_rttEstimator.getSmoothedRtt() / time::microseconds(500);
+      numStates = m_rttEstimator.getSmoothedRtt() / time::milliseconds (1);
+      //std::cerr << numStates << std::endl;
     }
-     */
+
     const int wait = 5;
     const double tolerance = 0.2;
     if (finished()) return;
@@ -130,7 +187,7 @@ private:
         //sending rate is below previous sending rate
         m_lastProbeSegment = m_highRequested + 1;
         //Adjustment gets back
-        multiplitiveDecrease();
+        cubicDecrease();
         m_adjustmentState = numStates;
         resetRate();
         return;
@@ -154,9 +211,9 @@ private:
     resetRate();
 
     if (compare(rate, m_burstSz, tolerance)) {
-      multiplitiveDecrease();
+      cubicDecrease();
     } else
-      additiveIncrease();
+      cubicIncrease();
   }
 
   //above is rate based control
@@ -219,6 +276,11 @@ private:
   int m_adjustmentState;
   //std::list<double> m_rate_history;
   double m_last_bs;
+
+
+  //cubic
+  double m_wmax = 0.0; ///< window size before last window decrease
+  double m_lastWmax = 0.0; ///< last wmax
 };
 }
 

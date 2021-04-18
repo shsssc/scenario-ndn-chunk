@@ -69,6 +69,7 @@ ndn::NetBLTApp::NetBLTApp(std::string s) : m_nextSegment(0), m_prefix(std::move(
   m_defaultRTT = m_options.m_defaultRTT;
   m_burstInterval_ms = m_options.m_burstInterval_ms;
   std::cout << std::setprecision(10);
+  std::cout << "event, segment, time, rate\n";
 }
 
 void ndn::NetBLTApp::run() {

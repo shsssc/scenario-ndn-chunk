@@ -13,8 +13,8 @@ Dst2   NA        3       9 4
 link
 
 # srcNode   dstNode     bandwidth   metric  delay   queue
-Src1        Rtr1        1Gbps      1        10ms    1000
-Src2        Rtr1        1Gbps      1        10ms    1000
-Rtr1        Rtr2        0.2Gbps      1        10ms    9000
-Dst1        Rtr2        1Gbps      1        10ms    3000
-Dst2        Rtr2        1Gbps      1        10ms    3000
+Src1        Rtr1        1Gbps      1        20ms    1000
+Src2        Rtr1        1Gbps      1        20ms    1000
+Rtr1        Rtr2        0.5Gbps    1        20ms    9000
+Dst1        Rtr2        1Gbps      1        20ms    3000
+Dst2        Rtr2        1Gbps      1        20ms    3000
