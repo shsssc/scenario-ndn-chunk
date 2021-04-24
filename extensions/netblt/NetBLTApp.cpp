@@ -56,7 +56,7 @@ void ndn::NetBLTApp::outputData() {
 ndn::NetBLTApp::NetBLTApp(std::string s) : m_nextSegment(0), m_prefix(std::move(s)),
                                            m_hasLastSegment(false), m_burstSz(100), m_minBurstSz(1),
                                            m_lastDecrease(),
-                                           m_burstInterval_ms(5), m_SOSSz(10000), m_defaultRTT(140),
+                                           m_burstInterval_ms(5), m_SOSSz(10000), m_defaultRTT(250),
                                            m_nextToPrint(0), m_bytesTransfered(0),
                                            m_retransmissionCount(0), m_startTime(), m_lastSegment(0),
                                            m_highRequested(0),
@@ -68,6 +68,10 @@ ndn::NetBLTApp::NetBLTApp(std::string s) : m_nextSegment(0), m_prefix(std::move(
   m_minBurstSz = m_options.m_minBurstSz;
   m_defaultRTT = m_options.m_defaultRTT;
   m_burstInterval_ms = m_options.m_burstInterval_ms;
+  m_rttEstimator.addMeasurement(m_defaultRTT);
+  for (int i = 0; i < 50; i++) {
+    m_rttEstimator.addMeasurement(m_defaultRTT);
+  }
   std::cout << std::setprecision(10);
   std::cout << "event, segment, time, rate\n";
 }
@@ -80,7 +84,7 @@ void ndn::NetBLTApp::run() {
     m_versionedName = versionedName;
     fetchLoop();
     checkRto();
-    rateStateMachine();
+    rateStateMachineNew();
   });
   m_dv->onDiscoveryFailure.connect([](const std::string &msg) {
     std::cout << msg;
@@ -124,6 +128,10 @@ void ndn::NetBLTApp::checkRto() {
 
 bool ndn::NetBLTApp::expressOneInterest() {
   uint32_t segToFetch = 0;
+  while (!retransmissionPQ.empty()
+         && m_inNetworkPkt.find(retransmissionPQ.top()) == m_inNetworkPkt.end()) {
+    retransmissionPQ.pop();
+  }
   if (!retransmissionPQ.empty()) {
     segToFetch = retransmissionPQ.top();
     m_inNetworkPkt[segToFetch].inRtQueue = false;
@@ -201,9 +209,13 @@ void ndn::NetBLTApp::handleData(const ndn::Interest &interest, const ndn::Data &
     if (!m_inNetworkPkt[segment].retransmitted) {
       auto t = time::steady_clock::now() - m_inNetworkPkt[segment].timeSent;
       m_rttEstimator.addMeasurement(t);
+      if (t < time::milliseconds(1)) {
+        std::cerr << t << std::endl;
+        std::cerr << time::steady_clock::now() << "  " << m_inNetworkPkt[segment].timeSent;
+        std::cerr << segment << std::endl;
+      }
       m_sc.report(t.count() / 1e4);
     }
-
     m_inNetworkPkt.erase(segment);
   }
 
@@ -255,10 +267,11 @@ void ndn::NetBLTApp::handleTimeout(const ndn::Interest &interest) {
 
 void ndn::NetBLTApp::retransmit(uint32_t segment) {
   if (m_inNetworkPkt[segment].inRtQueue) return;
-  retransmissionPQ.push(segment);
+
   m_inNetworkPkt[segment].inRtQueue = true;
   m_inNetworkPkt[segment].retransmitted = true;
   m_retransmissionCount++;
+  retransmissionPQ.push(segment);
 }
 
 bool ndn::NetBLTApp::decreaseWindow(bool weak) {
