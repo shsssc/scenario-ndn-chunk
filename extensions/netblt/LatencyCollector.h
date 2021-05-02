@@ -21,23 +21,28 @@
 
 
 class LatencyCollector {
-
-  uint32_t averageInterval = 64;
-  uint32_t history = 30;
-  uint32_t increaseThreshold = 12;
-  std::list<uint32_t> tmpList;
-  std::list<uint32_t> statsList;
+  const uint32_t threshold = 2000000;//2ms
+  uint32_t averageInterval = 20;
+  uint32_t history = 25;
+  uint32_t minHistorySize = 22;
+  std::list<uint64_t> tmpList;
+  std::list<uint64_t> statsList;
   bool hasNotChecked;
+  int min_rtt = -1;
 public:
+  int getMinRTT() {
+    return min_rtt;
+  }
+
   LatencyCollector() {
     hasNotChecked = true;
   }
 
-  void report(uint32_t time) {
+  void report(uint64_t time) {
     tmpList.push_back(time);
     if (tmpList.size() < averageInterval) return;
-    uint32_t sum = 0;
-    for (uint32_t i : tmpList) {
+    uint64_t sum = 0;
+    for (uint64_t i : tmpList) {
       sum += i;
     }
     sum /= tmpList.size();
@@ -49,14 +54,21 @@ public:
   }
 
   bool shouldDecrease() {
+    //return false;
     if (!hasNotChecked) return false;
-    if (statsList.size() < increaseThreshold) return false;
+    if (statsList.size() < minHistorySize) return false;
+    //std::cerr << minInterval() << std::endl;
+    if (*statsList.rbegin() > minInterval() + threshold) {
+      return true;
+    } else {
+      return false;
+    }
     hasNotChecked = false;
     auto i = statsList.rbegin();
     uint32_t nextTime = *i;
     i++;
-    for (int j = 0; j < increaseThreshold - 1; j++) {
-      if (*i >= nextTime) return false;
+    for (int j = 0; j < minHistorySize - 1; j++) {
+      if (*i > nextTime) return false;
       nextTime = *i;
       i++;
     }
@@ -68,16 +80,18 @@ public:
     return !statsList.empty();
   }
 
-  uint32_t minInterval() {
-    uint32_t min = statsList.front();
+  uint64_t minInterval() {
+    uint64_t min = statsList.front();
     for (auto i : statsList) {
       if (i < min) min = i;
     }
+    min_rtt = min / 1000000;
     return min;
   }
 
   void clear() {
-
+    statsList.clear();
+    tmpList.clear();
   }
 
 };

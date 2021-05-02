@@ -91,12 +91,13 @@ private:
   void multiplitiveDecrease() {
     m_burstSz /= 1.5;
     m_last_bs = -1;//already bad recv rate, not reasonable to monitor the rate
+    m_sc.clear();
     std::cerr << "decrease at" << m_burstSz << "," << "" << ","
               << time::steady_clock::now().time_since_epoch().count() / 1000000 << std::endl;
   }
 
   void cubicIncrease() {
-    constexpr double CUBIC_C = 0.05;
+    constexpr double CUBIC_C = 0.03;
     // Slow start phase
     if (m_burstSz < m_options.initSsthresh) {
       m_burstSz *= 2;
@@ -137,6 +138,7 @@ private:
 
   void cubicDecrease() {
     m_last_bs = -1;
+    m_sc.clear();
     constexpr double CUBIC_C = 0.4;
     if (m_options.enableFastConv && m_burstSz < m_lastWmax) {
       m_lastWmax = m_burstSz;
@@ -154,128 +156,88 @@ private:
     m_lastDecrease = time::steady_clock::now();
   }
 
-  double getRate() {
-    if (m_recvCount <= 0) return 0;
-    return m_recvCount * 1e9 * 0.005 / (time::steady_clock::now() - m_lastRecvCheckpoint).count();
-  }
-
   void resetRate() {
     m_recvCount = 0;
     m_lastRecvCheckpoint = time::steady_clock::now();
+    m_rateCollected__ = 0;
   }
 
   void rateStateMachineNew() {
     const int WAIT_STATE = 0;
     const int GOTBACK_STATE = 1;
-    const double tolerance = 0.2;
+    const double tolerance = 0.055;
+    const int target_RTT = 120;
+    const int makeup_stages = 0;
+            //m_sc.getMinRTT() < 0 || target_RTT <= m_sc.getMinRTT() ? 0 : target_RTT - m_sc.getMinRTT();
     if (finished()) return;
     m_scheduler.schedule(time::microseconds(1000), [this] { rateStateMachineNew(); });
-    //std::cerr << "last prob " << m_lastProbeSegment << "high ack" << m_highAcked << std::endl;
+
     if (m_adjustmentState == WAIT_STATE && m_lastProbeSegment < m_highAcked) {
-      //std::cerr << "174 transit to gotback" << std::endl;
+      //just got back
+      m_makeupCount = 0;
       m_adjustmentState = GOTBACK_STATE;
       resetRate();
-      m_rmn.clear();//we do not use data for this interval since its transition
-      return;
-    }
-    m_rmn.reportReceived(m_recvCount);
-    resetRate();
-    //std::cerr << "182   " << m_adjustmentState << std::endl;
-    if (!m_rmn.ready())return;
-    double rate = m_rmn.getRate();
-    if (m_adjustmentState == GOTBACK_STATE) {
-      std::cerr << rate << ",current " << m_burstSz << std::endl;
-      m_adjustmentState = WAIT_STATE;//rate must change once ready
-      m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
-
-      if (compare(rate, m_burstSz, tolerance)) {
+      m_rmn.nextStage(m_last_bs);//we do not use data for this interval since its transition
+      if (m_sc.shouldDecrease()) {
+        std::cerr << "!!!!!!!!!SC DECREASE" << std::endl;
+      }
+      if (m_rmn.queueUsageHigh() || m_sc.shouldDecrease()) {
+        m_adjustmentState = WAIT_STATE;
+        m_lastProbeSegment = m_highRequested + 1;//aft
         cubicDecrease();
-      } else {
-        m_last_bs = m_burstSz;
-        cubicIncrease();
+        m_rmn.reportDecrease();
+        std::cerr << m_last_bs << ",!!!!!!!earlyDecrease " << m_last_bs << std::endl;
       }
       return;
     }
 
-    //m_adjustmentState == WAIT_STATE
-    //for every wait state with enough data, we do the check
+    m_rmn.reportReceived(m_recvCount);
+    resetRate();
+    if (!m_rmn.ready())return;
+    //we have at least waited measurement window size
 
+    double rate = m_rateCollected__ = m_rmn.getRate();
+
+    //run makeup
+
+    if (m_adjustmentState == GOTBACK_STATE && m_makeupCount < makeup_stages) {
+      m_makeupCount++;
+      if (compare(rate, m_burstSz, tolerance)|| m_sc.shouldDecrease()) {
+        cubicDecrease();
+        m_adjustmentState = WAIT_STATE;//rate must change once ready
+        m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
+        m_rmn.reportDecrease();
+      }
+      return;
+    }
+
+    if (m_adjustmentState == GOTBACK_STATE) {
+      m_adjustmentState = WAIT_STATE;//rate must change once ready
+      m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
+      if (compare(rate, m_burstSz, tolerance)) {
+        cubicDecrease();
+        m_rmn.reportDecrease();
+      } else {
+        m_last_bs = m_burstSz;
+        cubicIncrease();
+      }
+      std::cerr << rate << ",current " << m_burstSz << std::endl;
+
+      return;
+    }
+
+    //m_adjustmentState == WAIT_STATE
+    //we are waiting for probe to get back
     if (compare(rate, m_last_bs, tolerance)) {
       //m_adjustmentState = WAIT_STATE;//rate must change once ready
       m_lastProbeSegment = m_highRequested + 1;//aft
       cubicDecrease();
+      m_rmn.reportDecrease();
       std::cerr << rate << ",lastdecrease " << m_last_bs << std::endl;
       //next wait_state will not adjust
     }
 
   }
-
-  /*
-  void rateStateMachine() {
-    const int WAIT_STATE = 0;
-    static int numStates;
-    if (m_adjustmentState == WAIT_STATE && !m_rttEstimator.hasSamples()) {
-      numStates = 60;
-      m_rmn.setHistory(numStates);
-      std::cerr << "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!" << std::endl;
-    }
-
-    if (m_rttEstimator.hasSamples() && m_adjustmentState == WAIT_STATE) {
-      numStates = m_rttEstimator.getSmoothedRtt() / time::milliseconds(1);
-      m_rmn.setHistory(numStates);
-      //std::cerr << numStates << std::endl;
-    }
-
-    const int wait = 5;
-    const double tolerance = 0.1;
-    if (finished()) return;
-    m_scheduler.schedule(time::microseconds(1000), [this] { rateStateMachine(); });
-    m_rmn.reportReceived(m_recvCount);
-    resetRate();
-    if (m_lastProbeSegment >= m_highAcked) {
-      //probe have not get back
-      return;
-    }
-    //probe have get back
-    if (m_adjustmentState == WAIT_STATE) {
-      //we just get the probe
-      double rate = m_rmn.getRate();
-      std::cerr << rate << ", " << m_last_bs << std::endl;
-      std::cerr << m_rmn.lessThan(m_burstSz) << std::endl;
-      if (compare(rate, m_last_bs, tolerance)) {
-        //sending rate is below previous sending rate
-        m_lastProbeSegment = m_highRequested + 1; //mark new probe and wait for new adjustment to take effect
-        cubicDecrease();//also invalidate receiving rate compare measure by setting last_recv=-1
-        m_adjustmentState = numStates;
-        return;
-      }
-      m_adjustmentState = numStates;
-    }
-
-    if (m_adjustmentState == numStates - wait) {
-      //wait for queue drop
-      m_rmn.clear();
-    }
-
-    m_adjustmentState--;//goto next state
-    if (m_adjustmentState != WAIT_STATE) return;
-    //we conducted enough measurement to make a decision
-
-    m_lastProbeSegment = m_highRequested + 1;
-    //Adjustment gets back
-    m_last_bs = m_burstSz;
-
-    double rate = m_rmn.getRate();
-    std::cerr << "->start";
-    std::cerr << rate << ", " << m_burstSz << std::endl;
-    std::cerr << m_rmn.lessThan(m_burstSz) << std::endl;
-    std::cerr << "<-end";
-    if (compare(rate, m_burstSz, tolerance)) {
-      cubicDecrease();
-    } else
-      cubicIncrease();
-  }
-   */
 
   //above is rate based control
   //---------------------------
@@ -324,6 +286,7 @@ private:
   uint32_t m_retransmissionCount;
   time::steady_clock::TimePoint m_startTime;
   util::RttEstimator m_rttEstimator;
+  double m_rateCollected__ = 0;
 
 
   //experimental: flow balance
@@ -335,6 +298,7 @@ private:
   RateMeasureNew m_rmn;
   //state machine
   int m_adjustmentState;
+  int m_makeupCount = 0;
   //std::list<double> m_rate_history;
   double m_last_bs;
 

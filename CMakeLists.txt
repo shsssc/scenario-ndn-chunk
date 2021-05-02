@@ -40,4 +40,4 @@ add_executable(extensions
         extensions/put/putChunks.hpp
         scenarios/ndn-simple.cpp
         scenarios/typologyReader1.cpp
-        extensions/netblt/NetBLT.cpp extensions/netblt/NetBLT.h extensions/netblt/NetBLTApp.cpp extensions/netblt/NetBLTApp.h extensions/netblt/options.h scenarios/multiple.cpp scenarios/typologyReader.cpp scenarios/ndn-simple-mpi.cpp extensions/netblt/LatencyCollector.h extensions/netblt/RateCollector.h extensions/netblt/RateMeasureNew.cpp extensions/netblt/RateMeasureNew.h)
+        extensions/netblt/NetBLT.cpp extensions/netblt/NetBLT.h extensions/netblt/NetBLTApp.cpp extensions/netblt/NetBLTApp.h extensions/netblt/options.h scenarios/multiple.cpp scenarios/typologyReader.cpp scenarios/ndn-simple-mpi.cpp extensions/netblt/LatencyCollector.h extensions/netblt/RateCollector.h extensions/netblt/RateMeasureNew.cpp extensions/netblt/RateMeasureNew.h scenarios/topo-3-consumer-mpi.cpp)

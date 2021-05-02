@@ -209,12 +209,12 @@ void ndn::NetBLTApp::handleData(const ndn::Interest &interest, const ndn::Data &
     if (!m_inNetworkPkt[segment].retransmitted) {
       auto t = time::steady_clock::now() - m_inNetworkPkt[segment].timeSent;
       m_rttEstimator.addMeasurement(t);
-      if (t < time::milliseconds(1)) {
-        std::cerr << t << std::endl;
-        std::cerr << time::steady_clock::now() << "  " << m_inNetworkPkt[segment].timeSent;
-        std::cerr << segment << std::endl;
-      }
-      m_sc.report(t.count() / 1e4);
+      //if (t < time::milliseconds(1)) {
+      //  std::cerr << t << std::endl;
+      //  std::cerr << time::steady_clock::now() << "  " << m_inNetworkPkt[segment].timeSent;
+      //  std::cerr << segment << std::endl;
+      //}
+      m_sc.report(t.count());
     }
     m_inNetworkPkt.erase(segment);
   }
@@ -230,7 +230,7 @@ void ndn::NetBLTApp::handleData(const ndn::Interest &interest, const ndn::Data &
   //we output window after change
   if (m_options.isVerbose) {
     std::cout << "ack, " << segment << "," << time::steady_clock::now().time_since_epoch().count() / 1000000. << ","
-              << m_rc.getRate() //m_burstSz
+              << m_rateCollected__ //m_burstSz
               << std::endl;
   }
   if (segment > m_highAcked)m_highAcked = segment;

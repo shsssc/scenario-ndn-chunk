@@ -67,7 +67,7 @@ int
 main(int argc, char *argv[]) {
   // setting default parameters for PointToPoint links and channels
   Config::SetDefault("ns3::PointToPointNetDevice::DataRate", StringValue("0.5Gbps"));
-  Config::SetDefault("ns3::PointToPointChannel::Delay", StringValue("30ms"));
+  Config::SetDefault("ns3::PointToPointChannel::Delay", StringValue("15ms"));
   Config::SetDefault("ns3::QueueBase::MaxSize", StringValue("10000p"));
 
   bool nullmsg = false;
