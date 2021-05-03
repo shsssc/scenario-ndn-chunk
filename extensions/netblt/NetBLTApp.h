@@ -165,10 +165,12 @@ private:
   void rateStateMachineNew() {
     const int WAIT_STATE = 0;
     const int GOTBACK_STATE = 1;
-    const double tolerance = 0.055;
+    const int MAKEUP_STATE = 2;
+    const double allowedPacketerror = 1.35;
+    const double tolerance = allowedPacketerror / m_rmn.measurementDelay() * 1000 / 200;
     const int target_RTT = 120;
-    const int makeup_stages = 0;
-            //m_sc.getMinRTT() < 0 || target_RTT <= m_sc.getMinRTT() ? 0 : target_RTT - m_sc.getMinRTT();
+    const int makeup_stages =
+            m_sc.getMinRTT() < 0 || target_RTT <= m_sc.getMinRTT() ? 0 : target_RTT - m_sc.getMinRTT();
     if (finished()) return;
     m_scheduler.schedule(time::microseconds(1000), [this] { rateStateMachineNew(); });
 
@@ -191,18 +193,11 @@ private:
       return;
     }
 
-    m_rmn.reportReceived(m_recvCount);
-    resetRate();
-    if (!m_rmn.ready())return;
-    //we have at least waited measurement window size
-
-    double rate = m_rateCollected__ = m_rmn.getRate();
 
     //run makeup
-
-    if (m_adjustmentState == GOTBACK_STATE && m_makeupCount < makeup_stages) {
+    if (m_adjustmentState == MAKEUP_STATE) {
       m_makeupCount++;
-      if (compare(rate, m_burstSz, tolerance)|| m_sc.shouldDecrease()) {
+      if (m_makeupCount >= makeup_stages) {
         cubicDecrease();
         m_adjustmentState = WAIT_STATE;//rate must change once ready
         m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
@@ -211,13 +206,20 @@ private:
       return;
     }
 
+    m_rmn.reportReceived(m_recvCount);
+    resetRate();
+    if (!m_rmn.ready())return;
+    //we have at least waited measurement window size
+
+    double rate = m_rateCollected__ = m_rmn.getRate();
+
+
     if (m_adjustmentState == GOTBACK_STATE) {
-      m_adjustmentState = WAIT_STATE;//rate must change once ready
-      m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
       if (compare(rate, m_burstSz, tolerance)) {
-        cubicDecrease();
-        m_rmn.reportDecrease();
+        m_adjustmentState = MAKEUP_STATE;
       } else {
+        m_adjustmentState = WAIT_STATE;//rate must change once ready
+        m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
         m_last_bs = m_burstSz;
         cubicIncrease();
       }
@@ -230,9 +232,7 @@ private:
     //we are waiting for probe to get back
     if (compare(rate, m_last_bs, tolerance)) {
       //m_adjustmentState = WAIT_STATE;//rate must change once ready
-      m_lastProbeSegment = m_highRequested + 1;//aft
-      cubicDecrease();
-      m_rmn.reportDecrease();
+      m_adjustmentState = MAKEUP_STATE;
       std::cerr << rate << ",lastdecrease " << m_last_bs << std::endl;
       //next wait_state will not adjust
     }

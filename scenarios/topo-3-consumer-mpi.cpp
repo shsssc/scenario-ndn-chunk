@@ -13,6 +13,28 @@
 #else
 #error "ndn-simple-mpi scenario can be compiled only if NS3_MPI is enabled"
 #endif
+
+#define INSTALL_NODE(n)\
+Ptr<Node> consumer##n = Names::Find<Node>("Src"#n);\
+Ptr<Node> producer##n = Names::Find<Node>("Dst"#n);\
+ndn::AppHelper consumerHelper##n("NetBLT");\
+consumerHelper##n.SetAttribute("Prefix", StringValue("/dst"#n));\
+if (systemId == (n-1)) {\
+consumerHelper##n.SetAttribute("logfile", StringValue("consumer_"#n".log"));\
+}\
+\
+auto app##n = consumerHelper##n.Install(consumer##n);\
+app##n.Start(Seconds(1+n));\
+\
+ndn::AppHelper producerHelper##n("PutChunks");\
+producerHelper##n.SetAttribute("Prefix", StringValue("/dst"#n));\
+producerHelper##n.SetAttribute("size", StringValue("2500000000"));\
+\
+\
+ndnGlobalRoutingHelper.AddOrigins("/dst"#n, producer##n);\
+producerHelper##n.SetPrefix("/dst"#n);\
+producerHelper##n.Install(producer##n)
+
 namespace ns3 {
 
 void queueSizeTrace(Ptr<Node> node) {
@@ -50,7 +72,7 @@ main(int argc, char *argv[]) {
   uint32_t systemCount = MpiInterface::GetSize();
 
   AnnotatedTopologyReader topologyReader("", 25);
-  topologyReader.SetFileName("scenarios/topo-6-node.txt");
+  topologyReader.SetFileName("scenarios/topo-3-consumer.txt");
   topologyReader.Read();
 
   // Install NDN stack on all nodes
@@ -66,60 +88,18 @@ main(int argc, char *argv[]) {
   ndnGlobalRoutingHelper.InstallAll();
 
   // Getting containers for the consumer/producer
-  Ptr<Node> consumer1 = Names::Find<Node>("Src1");
-  Ptr<Node> consumer2 = Names::Find<Node>("Src2");
 
-  Ptr<Node> producer1 = Names::Find<Node>("Dst1");
-  Ptr<Node> producer2 = Names::Find<Node>("Dst2");
-  ndn::AppHelper consumerHelper("NetBLT");
-  ndn::AppHelper consumerHelper1("NetBLT");
+  INSTALL_NODE(1);
+  INSTALL_NODE(2);
+  INSTALL_NODE(3);
 
-  // on the first consumer node install a Consumer application
-  // that will express interests in /dst1 namespace
-  consumerHelper.SetAttribute("Prefix", StringValue("/dst1"));
-  if (systemId == 0) {
-    consumerHelper.SetAttribute("logfile", StringValue("consumer0.log"));
-    ndn::L3RateTracer::Install(consumer1, "consumer1.txt", Seconds(0.2));
-  }
-  auto app = consumerHelper.Install(consumer1);
-  app.Start(Seconds(2.00));
-
-  // on the second consumer node install a Consumer application
-  // that will express interests in /dst2 namespace
-  consumerHelper1.SetAttribute("Prefix", StringValue("/dst2"));
-  if (systemId == 1) {
-    consumerHelper1.SetAttribute("logfile", StringValue("consumer1.log"));
-    ndn::L3RateTracer::Install(consumer2, "consumer2.txt", Seconds(0.2));
-  }
-  consumerHelper1.Install(consumer2).Start(Seconds(2.48));
-
-
-  ndn::AppHelper producerHelper("PutChunks");
-  producerHelper.SetAttribute("Prefix", StringValue("/dst1"));
-  producerHelper.SetAttribute("size", StringValue("3000000000"));
-
-  ndn::AppHelper producerHelper1("PutChunks");
-  producerHelper1.SetAttribute("Prefix", StringValue("/dst2"));
-  producerHelper1.SetAttribute("size", StringValue("3000000000"));
-
-  // Register /dst1 prefix with global routing controller and
-  // install producer that will satisfy Interests in /dst1 namespace
-  ndnGlobalRoutingHelper.AddOrigins("/dst1", producer1);
-  producerHelper.SetPrefix("/dst1");
-  producerHelper.Install(producer1);
-
-  // Register /dst2 prefix with global routing controller and
-  // install producer that will satisfy Interests in /dst2 namespace
-  ndnGlobalRoutingHelper.AddOrigins("/dst2", producer2);
-  producerHelper1.SetPrefix("/dst2");
-  producerHelper1.Install(producer2);
 
   // Calculate and install FIBs
   ndn::GlobalRoutingHelper::CalculateRoutes();
 
   Simulator::Stop(Seconds(300.0));
 
-  if (systemId == 5) {
+  if (systemId == 4) {
     int fd = open("queueTrace.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);
     close(STDOUT_FILENO);
     dup(fd);
