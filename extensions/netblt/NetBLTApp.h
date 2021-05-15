@@ -150,7 +150,7 @@ private:
       m_wmax = m_burstSz;
     }
     //std::cerr << "reduced from " << m_burstSz << m_wmax << std::endl;
-    m_burstSz = std::max(1., m_burstSz * m_options.cubicBeta);
+    m_burstSz = std::max(1., m_wmax * m_options.cubicBeta);
     //std::cerr << "reduced to " << m_burstSz << m_wmax << std::endl;
 
     m_lastDecrease = time::steady_clock::now();
@@ -165,8 +165,8 @@ private:
   void rateStateMachineNew() {
     const int WAIT_STATE = 0;
     const int GOTBACK_STATE = 1;
-    const int MAKEUP_STATE = 2;
-    const double allowedPacketerror = 1.35;
+    const int HOLDON_STATE = 2;
+    const double allowedPacketerror = 1.4;
     const double tolerance = allowedPacketerror / m_rmn.measurementDelay() * 1000 / 200;
     const int target_RTT = 120;
     const int makeup_stages =
@@ -192,12 +192,14 @@ private:
       }
       return;
     }
-
+    m_overshootFor++;
 
     //run makeup
-    if (m_adjustmentState == MAKEUP_STATE) {
+    if (m_adjustmentState == HOLDON_STATE) {
+      //if (m_makeupCount == 0)m_burstSz += tolerance * 2;
       m_makeupCount++;
-      if (m_makeupCount >= makeup_stages) {
+      if (m_makeupCount >= makeup_stages /*m_overshootFor >= 40*/) {
+        //std::cerr << "!!!!! Over shoot for" << m_overshootFor <<" min_RTT"<<m_sc.getMinRTT()  <<std::endl;
         cubicDecrease();
         m_adjustmentState = WAIT_STATE;//rate must change once ready
         m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
@@ -216,12 +218,14 @@ private:
 
     if (m_adjustmentState == GOTBACK_STATE) {
       if (compare(rate, m_burstSz, tolerance)) {
-        m_adjustmentState = MAKEUP_STATE;
+        m_adjustmentState = HOLDON_STATE;
       } else {
         m_adjustmentState = WAIT_STATE;//rate must change once ready
         m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
         m_last_bs = m_burstSz;
         cubicIncrease();
+        m_overshootFor = 0;
+
       }
       std::cerr << rate << ",current " << m_burstSz << std::endl;
 
@@ -232,7 +236,7 @@ private:
     //we are waiting for probe to get back
     if (compare(rate, m_last_bs, tolerance)) {
       //m_adjustmentState = WAIT_STATE;//rate must change once ready
-      m_adjustmentState = MAKEUP_STATE;
+      m_adjustmentState = HOLDON_STATE;
       std::cerr << rate << ",lastdecrease " << m_last_bs << std::endl;
       //next wait_state will not adjust
     }
@@ -299,6 +303,7 @@ private:
   //state machine
   int m_adjustmentState;
   int m_makeupCount = 0;
+  int m_overshootFor = 0;
   //std::list<double> m_rate_history;
   double m_last_bs;
 

@@ -31,7 +31,7 @@ struct Options {
 
     // Cubic pipeline options
     double cubicBeta = 0.7;       ///< cubic multiplicative decrease factor
-    bool enableFastConv = false;  ///< use cubic fast convergence
+    bool enableFastConv = true;  ///< use cubic fast convergence
 
     //SOS
     uint32_t m_SOSSz = 15000;

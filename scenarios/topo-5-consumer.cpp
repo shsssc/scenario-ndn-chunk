@@ -71,7 +71,7 @@ main(int argc, char *argv[]) {
   uint32_t systemCount = MpiInterface::GetSize();
 
   AnnotatedTopologyReader topologyReader("", 25);
-  topologyReader.SetFileName("scenarios/topo-4-consumer.txt");
+  topologyReader.SetFileName("scenarios/topo-5-consumer.txt");
   topologyReader.Read();
 
   // Install NDN stack on all nodes
@@ -92,6 +92,7 @@ main(int argc, char *argv[]) {
   INSTALL_NODE(2);
   INSTALL_NODE(3);
   INSTALL_NODE(4);
+  INSTALL_NODE(5);
 
 
   // Calculate and install FIBs
@@ -99,7 +100,7 @@ main(int argc, char *argv[]) {
 
   Simulator::Stop(Seconds(330.0));
 
-  if (systemId == 9) {
+  if (systemId == 11) {
     int fd = open("queueTrace.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);
     close(STDOUT_FILENO);
     dup(fd);

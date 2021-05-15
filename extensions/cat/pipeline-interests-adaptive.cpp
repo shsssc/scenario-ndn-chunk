@@ -44,6 +44,7 @@ PipelineInterestsAdaptive::PipelineInterestsAdaptive(Face &face,
           m_rttEstimator(rttEstimator), m_scheduler(m_face.getIoService()), m_highData(0), m_highInterest(0),
           m_recPoint(0), m_nInFlight(0), m_nLossDecr(0), m_nMarkDecr(0), m_nTimeouts(0), m_nSkippedRetx(0),
           m_nRetransmitted(0), m_nCongMarks(0), m_nSent(0), m_hasFailure(false), m_failedSegNo(0) {
+  std::cout << "event, segment, time, rate" << std::endl;
 }
 
 PipelineInterestsAdaptive::~PipelineInterestsAdaptive() {

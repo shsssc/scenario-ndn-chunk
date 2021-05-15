@@ -71,15 +71,15 @@ main(int argc, char *argv[]) {
 
   Ptr<Node> producer1 = Names::Find<Node>("Dst1");
   Ptr<Node> producer2 = Names::Find<Node>("Dst2");
-  ndn::AppHelper consumerHelper("NetBLT");
-  ndn::AppHelper consumerHelper1("NetBLT");
+  ndn::AppHelper consumerHelper("CatChunks");
+  ndn::AppHelper consumerHelper1("CatChunks");
 
   // on the first consumer node install a Consumer application
   // that will express interests in /dst1 namespace
   consumerHelper.SetAttribute("Prefix", StringValue("/dst1"));
   if (systemId == 0) {
     consumerHelper.SetAttribute("logfile", StringValue("consumer0.log"));
-    ndn::L3RateTracer::Install(consumer1, "consumer1.txt", Seconds(0.2));
+    //ndn::L3RateTracer::Install(consumer1, "consumer1.txt", Seconds(0.2));
   }
   auto app = consumerHelper.Install(consumer1);
   app.Start(Seconds(2.00));
@@ -89,7 +89,7 @@ main(int argc, char *argv[]) {
   consumerHelper1.SetAttribute("Prefix", StringValue("/dst2"));
   if (systemId == 1) {
     consumerHelper1.SetAttribute("logfile", StringValue("consumer1.log"));
-    ndn::L3RateTracer::Install(consumer2, "consumer2.txt", Seconds(0.2));
+    //ndn::L3RateTracer::Install(consumer2, "consumer2.txt", Seconds(0.2));
   }
   consumerHelper1.Install(consumer2).Start(Seconds(2.48));
 

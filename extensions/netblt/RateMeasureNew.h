@@ -96,7 +96,7 @@ public:
 
   bool queueUsageHigh() {
     //return false;
-    if (totalMismatch < -4.5 && stageMismatchHistory.size() >= stageHistorySize) return true;
+    if (totalMismatch < -5.5 && stageMismatchHistory.size() >= stageHistorySize) return true;
     return false;
   }
 

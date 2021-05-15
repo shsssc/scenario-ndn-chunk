@@ -75,7 +75,7 @@ namespace ndn {
             unique_ptr<PipelineInterestsAdaptive> adaptivePipeline;
             unique_ptr<DiscoverVersion> discover;
             std::string uri;
-            std::string pipelineType = "aimd";
+            std::string pipelineType = "cubic";
             std::string cwndPath;
             std::string rttPath;
             time::milliseconds::rep minRto = 200;

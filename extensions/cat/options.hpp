@@ -46,8 +46,8 @@ struct Options
   size_t maxPipelineSize = 1;
 
   // Adaptive pipeline common options
-  double initCwnd = 240.0;        ///< initial congestion window size
-  double initSsthresh = 240; ///< initial slow start threshold
+  double initCwnd = 20.0;        ///< initial congestion window size
+  double initSsthresh = 100; ///< initial slow start threshold
   time::milliseconds rtoCheckInterval{10}; ///< interval for checking retransmission timer
   bool ignoreCongMarks = false; ///< disable window decrease after receiving congestion mark
   bool disableCwa = false;      ///< disable conservative window adaptation
@@ -58,7 +58,7 @@ struct Options
   bool resetCwndToInit = false; ///< reduce cwnd to initCwnd when loss event occurs
 
   // Cubic pipeline options
-  double cubicBeta = 0.7;       ///< cubic multiplicative decrease factor
+  double cubicBeta = 0.5;       ///< cubic multiplicative decrease factor
   bool enableFastConv = false;  ///< use cubic fast convergence
 };
 

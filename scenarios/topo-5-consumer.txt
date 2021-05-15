@@ -7,12 +7,14 @@ Src1   NA        1       0 0
 Src2   NA        3       1 1
 Src3   NA        3       2 2
 Src4   NA        3       3 3
-Dst1   NA        1       4 4
-Dst2   NA        3       5 5
-Dst3   NA        3       6 6
-Dst4   NA        3       7 7
-Rtr1   NA        2       8 8
-Rtr2   NA        2       9 9
+Src5   NA        3       3 4
+Dst1   NA        1       4 5
+Dst2   NA        3       5 6
+Dst3   NA        3       6 7
+Dst4   NA        3       7 8
+Dst5   NA        3       7 9
+Rtr1   NA        2       8 10
+Rtr2   NA        2       9 11
 
 link
 
@@ -21,8 +23,10 @@ Src1        Rtr1        1Gbps      1        45ms    1000
 Src2        Rtr1        1Gbps      1        35ms    1000
 Src3        Rtr1        1Gbps      1        25ms    1000
 Src4        Rtr1        1Gbps      1        20ms    1000
-Rtr1        Rtr2        0.4Gbps    1        2ms    9000
+Src5        Rtr1        1Gbps      1        20ms    1000
+Rtr1        Rtr2        0.5Gbps    1        2ms    9000
 Dst1        Rtr2        1Gbps      1        3ms    2000
 Dst2        Rtr2        1Gbps      1        3ms    2000
 Dst3        Rtr2        1Gbps      1        3ms    2000
 Dst4        Rtr2        1Gbps      1        3ms    2000
+Dst5        Rtr2        1Gbps      1        3ms    2000
