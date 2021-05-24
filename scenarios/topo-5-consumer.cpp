@@ -24,11 +24,11 @@ consumerHelper##n.SetAttribute("logfile", StringValue("consumer_"#n".log"));\
 }\
 \
 auto app##n = consumerHelper##n.Install(consumer##n);\
-app##n.Start(Seconds(1+1.1*n));\
+app##n.Start(Seconds(1+10.1*n));\
 \
 ndn::AppHelper producerHelper##n("PutChunks");\
 producerHelper##n.SetAttribute("Prefix", StringValue("/dst"#n));\
-producerHelper##n.SetAttribute("size", StringValue("3000000000"));\
+producerHelper##n.SetAttribute("size", StringValue("9000000000"));\
 \
 \
 ndnGlobalRoutingHelper.AddOrigins("/dst"#n, producer##n);\
@@ -98,7 +98,7 @@ main(int argc, char *argv[]) {
   // Calculate and install FIBs
   ndn::GlobalRoutingHelper::CalculateRoutes();
 
-  Simulator::Stop(Seconds(330.0));
+  Simulator::Stop(Seconds(840.0));
 
   if (systemId == 11) {
     int fd = open("queueTrace.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);

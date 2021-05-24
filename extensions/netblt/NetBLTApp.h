@@ -97,7 +97,7 @@ private:
   }
 
   void cubicIncrease() {
-    constexpr double CUBIC_C = 0.03;
+    constexpr double CUBIC_C = 0.05;
     // Slow start phase
     if (m_burstSz < m_options.initSsthresh) {
       m_burstSz *= 2;
@@ -116,10 +116,15 @@ private:
       // 2. Time it takes to increase the window to m_wmax = the cwnd right before the last
       // window decrease.
       // K = cubic_root(wmax*(1-beta_cubic)/C) (Eq. 2)
-      const double k = std::cbrt(m_wmax * (1 - m_options.cubicBeta) / CUBIC_C);
+      double k = std::cbrt(m_wmax * (1 - m_options.cubicBeta) / CUBIC_C);
+      if (m_wmax * (m_options.cubicBeta) > (-.5 * k + m_wmax)) {
+        k = 1 / 0.5 * m_wmax * (1 - m_options.cubicBeta);
+      }
 
       // 3. Target: W_cubic(t) = C*(t-K)^3 + wmax (Eq. 1)
       const double wCubic = CUBIC_C * std::pow(t - k, 3) + m_wmax;
+      const double wAI = .5 * (t - k) + m_wmax;
+
       //std::cerr << t - k << ",!" << m_wmax << std::endl;
       // 4. Estimate of Reno Increase (Eq. 4)
       //const double rtt = m_rttEstimator.getSmoothedRtt().count() / 1e9;
@@ -131,7 +136,7 @@ private:
       // Note: This change is not part of the RFC, but I added it to improve performance.
       //cubicIncrement = std::max(0.0, cubicIncrement);
 
-      m_burstSz = wCubic;
+      m_burstSz = (t <= k) ? std::min(wCubic, wAI) : std::max(wCubic, wAI);
       //std::cerr << "set to " << m_burstSz << m_wmax << std::endl;
     }
   }
@@ -139,6 +144,7 @@ private:
   void cubicDecrease() {
     m_last_bs = -1;
     m_sc.clear();
+    m_options.initSsthresh = 2;
     constexpr double CUBIC_C = 0.4;
     if (m_options.enableFastConv && m_burstSz < m_lastWmax) {
       m_lastWmax = m_burstSz;

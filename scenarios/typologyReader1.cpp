@@ -24,11 +24,11 @@ consumerHelper##n.SetAttribute("logfile", StringValue("consumer_"#n".log"));\
 }\
 \
 auto app##n = consumerHelper##n.Install(consumer##n);\
-app##n.Start(Seconds(1+1.1*n));\
+app##n.Start(Seconds(1+2.43*n));\
 \
 ndn::AppHelper producerHelper##n("PutChunks");\
 producerHelper##n.SetAttribute("Prefix", StringValue("/dst"#n));\
-producerHelper##n.SetAttribute("size", StringValue("3000000000"));\
+producerHelper##n.SetAttribute("size", StringValue("6000000000"));\
 \
 \
 ndnGlobalRoutingHelper.AddOrigins("/dst"#n, producer##n);\
