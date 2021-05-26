@@ -1,0 +1,24 @@
+router
+
+# node  comment     yPos    xPos
+Src1   NA        1       0 0
+Src2   NA        3       1 1
+Src3   NA        3       2 2
+Dst1   NA        1       4 3
+Dst2   NA        3       5 4
+Dst3   NA        3       6 5
+Rtr1   NA        2       8 6
+Rtr2   NA        2       9 7
+Rtr3   NA        2       10 8
+
+link
+
+# srcNode   dstNode     bandwidth   metric  delay   queue
+Src1        Rtr1        .2Gbps      1        10ms    1000
+Src2        Rtr1        .2Gbps      1        10ms    1000
+Src3        Rtr2        .2Gbps      1        10ms    1000
+Rtr1        Rtr2        .2Gbps      1        10ms    3000
+Rtr2        Rtr3        .2Gbps      1        10ms    3000
+Dst2        Rtr2        .2Gbps      1        10ms    2000
+Dst1        Rtr3        .2Gbps      1        10ms    2000
+Dst3        Rtr3        .2Gbps      1        10ms    2000

@@ -19,7 +19,7 @@ struct Options {
 
     // Adaptive pipeline common options
     double initCwnd = 2.0;        ///< initial congestion window size
-    double initSsthresh = 25; ///< initial slow start threshold
+    double initSsthresh = 5; ///< initial slow start threshold
     time::milliseconds rtoCheckInterval{10}; ///< interval for checking retransmission timer
     bool ignoreCongMarks = false; ///< disable window decrease after receiving congestion mark
     bool disableCwa = false;      ///< disable conservative window adaptation
@@ -31,7 +31,7 @@ struct Options {
 
     // Cubic pipeline options
     double cubicBeta = 0.7;       ///< cubic multiplicative decrease factor
-    bool enableFastConv = true;  ///< use cubic fast convergence
+    bool enableFastConv = false;  ///< use cubic fast convergence
 
     //SOS
     uint32_t m_SOSSz = 15000;
