@@ -174,7 +174,7 @@ private:
     const int HOLDON_STATE = 2;
     const double allowedPacketerror = 1.4;
     const double tolerance = allowedPacketerror / m_rmn.measurementDelay() * 1000 / 200;
-    const int target_RTT = 120;
+    const int target_RTT = 0;
     const int makeup_stages =
             m_sc.getMinRTT() < 0 || target_RTT <= m_sc.getMinRTT() ? 0 : target_RTT - m_sc.getMinRTT();
     if (finished()) return;
@@ -189,7 +189,7 @@ private:
       if (m_sc.shouldDecrease()) {
         std::cerr << "!!!!!!!!!SC DECREASE" << std::endl;
       }
-      if (m_rmn.queueUsageHigh() || m_sc.shouldDecrease()) {
+      if (m_sc.shouldDecrease()) {
         m_adjustmentState = WAIT_STATE;
         m_lastProbeSegment = m_highRequested + 1;//aft
         cubicDecrease();
@@ -210,6 +210,7 @@ private:
         m_adjustmentState = WAIT_STATE;//rate must change once ready
         m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
         m_rmn.reportDecrease();
+        resetRate();
       }
       return;
     }

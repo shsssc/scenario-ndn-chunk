@@ -60,13 +60,23 @@ void queueSizeTrace(Ptr<Node> node) {
   std::cerr << "queue size, " << k << "," << ndn::time::steady_clock::now().time_since_epoch().count() / 1000000.
             << std::endl;
   Simulator::Schedule(Seconds(0.001), &queueSizeTrace, node);
+}
 
+void changeBandwidth(Ptr<Node> node) {
+  static bool state = true;
+  if (state) {
+    node->GetDevice(0)->SetAttribute("DataRate", StringValue("0.3Gbps"));
+  } else {
+    node->GetDevice(0)->SetAttribute("DataRate", StringValue("0.4Gbps"));
+  }
+  state = !state;
+  Simulator::Schedule(Seconds(20 + rand() % 3), &changeBandwidth, node);
 }
 
 int
 main(int argc, char *argv[]) {
   // setting default parameters for PointToPoint links and channels
-  Config::SetDefault("ns3::PointToPointNetDevice::DataRate", StringValue("0.5Gbps"));
+  Config::SetDefault("ns3::PointToPointNetDevice::DataRate", StringValue("0.4Gbps"));
   Config::SetDefault("ns3::PointToPointChannel::Delay", StringValue("15ms"));
   Config::SetDefault("ns3::QueueBase::MaxSize", StringValue("10000p"));
 
@@ -124,7 +134,7 @@ main(int argc, char *argv[]) {
   consumerHelper.SetAttribute("logfile", StringValue("consumer_single.log"));
   auto apps = consumerHelper.Install(node1);
   apps.Start(Seconds(1.0));
-  apps.Stop(Seconds(120.0));
+  apps.Stop(Seconds(180.0));
 
 
 
@@ -134,14 +144,14 @@ main(int argc, char *argv[]) {
   ndn::AppHelper producerHelper("PutChunks");
   // Producer will reply to all requests starting with /prefix
   producerHelper.SetAttribute("Prefix", StringValue("/ping"));
-  producerHelper.SetAttribute("size", StringValue("3000000000"));
+  producerHelper.SetAttribute("size", StringValue("6000000000"));
   if (systemId == 2 || systemId == 1 || systemId == 0) {
 
     producerHelper.Install(node3); // last node
   }
 
 
-  Simulator::Stop(Seconds(120.0));
+  Simulator::Stop(Seconds(180.0));
   //ndn::L3RateTracer::InstallAll("rate-trace.txt", Seconds(0.2));
 
   if (systemId == 2) {
@@ -151,6 +161,11 @@ main(int argc, char *argv[]) {
     std::cerr << "msg, size, time\n";
     Simulator::Schedule(Seconds(0.05), &queueSizeTrace, node3);
   }
+
+  if (systemId == 2) {
+    Simulator::Schedule(Seconds(15), &changeBandwidth, node3);
+  }
+
 
   Simulator::Run();
   MpiInterface::Disable();

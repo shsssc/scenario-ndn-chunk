@@ -14,7 +14,7 @@ class RateMeasureNew {
   std::list<double> stageMismatchHistory;
   std::vector<unsigned> msHistory;
   const unsigned short minHistory = 50;
-  unsigned short msHistorySize = 60;
+  unsigned short msHistorySize =30;
   unsigned short stageHistorySize = 5;
   unsigned stagePacketCount = 0;
   double totalMismatch = 0;
