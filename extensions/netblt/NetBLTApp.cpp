@@ -193,7 +193,8 @@ void ndn::NetBLTApp::fetchLoop() {
 
 void ndn::NetBLTApp::handleData(const ndn::Interest &interest, const ndn::Data &data) {
   m_recvCount++;
-  m_rc.receive(static_cast<int>(m_burstSz));
+  m_rmn.reportPacket(time::steady_clock::now().time_since_epoch().count());
+  //m_rc.receive(static_cast<int>(m_burstSz));
   //std::cerr << m_rc.getRate() << std::endl;
   if (!m_hasLastSegment && data.getFinalBlock()) {
     m_hasLastSegment = true;

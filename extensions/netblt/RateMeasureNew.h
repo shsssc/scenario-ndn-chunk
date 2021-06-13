@@ -11,10 +11,11 @@
 #include <random>
 
 class RateMeasureNew {
-  std::list<double> stageMismatchHistory;
+  //std::list<double> stageMismatchHistory;
+  std::list<uint64_t> time_history;
   std::vector<unsigned> msHistory;
   const unsigned short minHistory = 50;
-  unsigned short msHistorySize =30;
+  unsigned short msHistorySize = 15;
   unsigned short stageHistorySize = 5;
   unsigned stagePacketCount = 0;
   double totalMismatch = 0;
@@ -27,29 +28,37 @@ public:
   }
 
   void reportDecrease() {
-    stageMismatchHistory.clear();
+    //stageMismatchHistory.clear();
     totalMismatch = 0;
   }
 
+  void reportPacket(uint64_t t) {
+    time_history.push_back(t);
+    if (ready()) {
+      time_history.pop_front();
+    }
+  }
+
+  double getRate1() const {
+    auto r = *time_history.rbegin();
+    auto l = *time_history.begin();
+    auto sz = time_history.size();
+    return (sz - 1) * 1e9 / (r - l) * 0.005;
+    //return 0;
+  }
+
   void reportReceived(unsigned count) {
-    stagePacketCount += count;
-    msHistory.push_back(count);
+    //stagePacketCount += count;
+    msHistory.push_back(0);
     if (msHistory.size() > msHistorySize) {
-      auto tmp = msHistory[msHistory.size() - msHistorySize - 1];
-      stagePacketCount -= tmp;
+      //auto tmp = msHistory[msHistory.size() - msHistorySize - 1];
+      //stagePacketCount -= tmp;
       //msHistory.pop_front();
     }
   }
 
   bool ready() {
-    const bool USE_RANDOM = false;
-    std::random_device rd;
-    std::uniform_int_distribution<int> dist(-3, 3);
-    if (!USE_RANDOM) {
-      return msHistory.size() >= msHistorySize;
-    }
-    return msHistory.size() >= msHistorySize
-           || msHistory.size() >= msHistorySize + dist(rd);
+    return msHistory.size() >= msHistorySize;
   }
 
   unsigned size() {
@@ -60,20 +69,18 @@ public:
     return (double) stagePacketCount / msHistorySize * unit;
   }
 
-  void setHistory(unsigned short val) {
-    msHistorySize = val;
-    if (val < minHistory) msHistorySize = minHistory;
-  }
 
   bool nextStage(double last_bs) {
 
 
-    if (last_bs <= 0) {
-      msHistory.clear();
-      stagePacketCount = 0;
-      stageMismatchHistory.clear();
-      return false;
-    }
+    // if (last_bs <= 0) {
+    msHistory.clear();
+    stagePacketCount = 0;
+    time_history.clear();
+    //stageMismatchHistory.clear();
+    return false;
+    //}
+    /*
     unsigned tmp = 0;
     for (auto i : msHistory) {
       tmp += i;
@@ -91,7 +98,13 @@ public:
     msHistory.clear();
     stagePacketCount = 0;
     return false;
+    */
+  }
 
+  /*
+  void setHistory(unsigned short val) {
+    msHistorySize = val;
+    if (val < minHistory) msHistorySize = minHistory;
   }
 
   bool queueUsageHigh() {
@@ -115,6 +128,8 @@ public:
     }
     return false;
   }
+
+   */
 };
 
 

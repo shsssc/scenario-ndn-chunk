@@ -21,7 +21,7 @@
 
 
 class LatencyCollector {
-  const uint32_t threshold = 2000000;//2ms
+  const uint32_t threshold = 4000000;//2ms
   uint32_t averageInterval = 20;
   uint32_t history = 25;
   uint32_t minHistorySize = 22;
@@ -54,7 +54,7 @@ public:
   }
 
   bool shouldDecrease() {
-    //return false;
+    return false;
     if (!hasNotChecked) return false;
     if (statsList.size() < minHistorySize) return false;
     //std::cerr << minInterval() << std::endl;

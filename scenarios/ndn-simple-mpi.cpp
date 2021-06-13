@@ -64,13 +64,17 @@ void queueSizeTrace(Ptr<Node> node) {
 
 void changeBandwidth(Ptr<Node> node) {
   static bool state = true;
+  std::cout
+          << "bandwidth_change,  " << ndn::time::steady_clock::now().time_since_epoch().count() / 1e6 << std::endl;
   if (state) {
     node->GetDevice(0)->SetAttribute("DataRate", StringValue("0.3Gbps"));
   } else {
     node->GetDevice(0)->SetAttribute("DataRate", StringValue("0.4Gbps"));
   }
   state = !state;
-  Simulator::Schedule(Seconds(20 + rand() % 3), &changeBandwidth, node);
+  int t = 20 + rand() % 4;
+
+  Simulator::Schedule(Seconds(t), &changeBandwidth, node);
 }
 
 int
@@ -144,7 +148,7 @@ main(int argc, char *argv[]) {
   ndn::AppHelper producerHelper("PutChunks");
   // Producer will reply to all requests starting with /prefix
   producerHelper.SetAttribute("Prefix", StringValue("/ping"));
-  producerHelper.SetAttribute("size", StringValue("6000000000"));
+  producerHelper.SetAttribute("size", StringValue("60000000000"));
   if (systemId == 2 || systemId == 1 || systemId == 0) {
 
     producerHelper.Install(node3); // last node

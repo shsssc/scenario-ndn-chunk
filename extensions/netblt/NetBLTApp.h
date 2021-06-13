@@ -172,9 +172,9 @@ private:
     const int WAIT_STATE = 0;
     const int GOTBACK_STATE = 1;
     const int HOLDON_STATE = 2;
-    const double allowedPacketerror = 1.4;
+    const double allowedPacketerror = .6;
     const double tolerance = allowedPacketerror / m_rmn.measurementDelay() * 1000 / 200;
-    const int target_RTT = 0;
+    const int target_RTT = 120;
     const int makeup_stages =
             m_sc.getMinRTT() < 0 || target_RTT <= m_sc.getMinRTT() ? 0 : target_RTT - m_sc.getMinRTT();
     if (finished()) return;
@@ -217,10 +217,12 @@ private:
 
     m_rmn.reportReceived(m_recvCount);
     resetRate();
+
+    double rate = m_rateCollected__ = m_rmn.getRate1();
     if (!m_rmn.ready())return;
     //we have at least waited measurement window size
 
-    double rate = m_rateCollected__ = m_rmn.getRate();
+
 
 
     if (m_adjustmentState == GOTBACK_STATE) {
