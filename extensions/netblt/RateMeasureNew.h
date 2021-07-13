@@ -15,7 +15,7 @@ class RateMeasureNew {
   std::list<uint64_t> time_history;
   std::vector<unsigned> msHistory;
   const unsigned short minHistory = 50;
-  unsigned short msHistorySize = 15;
+  unsigned short msHistorySize = 30;
   unsigned short stageHistorySize = 5;
   unsigned stagePacketCount = 0;
   double totalMismatch = 0;
@@ -40,6 +40,7 @@ public:
   }
 
   double getRate1() const {
+    if (msHistory.size() < msHistorySize) return 0;
     auto r = *time_history.rbegin();
     auto l = *time_history.begin();
     auto sz = time_history.size();
@@ -48,11 +49,11 @@ public:
   }
 
   void reportReceived(unsigned count) {
-    //stagePacketCount += count;
-    msHistory.push_back(0);
+    stagePacketCount += count;
+    msHistory.push_back(count);
     if (msHistory.size() > msHistorySize) {
-      //auto tmp = msHistory[msHistory.size() - msHistorySize - 1];
-      //stagePacketCount -= tmp;
+      auto tmp = msHistory[msHistory.size() - msHistorySize - 1];
+      stagePacketCount -= tmp;
       //msHistory.pop_front();
     }
   }
@@ -66,6 +67,7 @@ public:
   }
 
   double getRate(short unit = 5) const {
+    if (msHistory.size() < msHistorySize) return 0;
     return (double) stagePacketCount / msHistorySize * unit;
   }
 

@@ -28,7 +28,7 @@ app##n.Start(Seconds(1+n));\
 \
 ndn::AppHelper producerHelper##n("PutChunks");\
 producerHelper##n.SetAttribute("Prefix", StringValue("/dst"#n));\
-producerHelper##n.SetAttribute("size", StringValue("2500000000"));\
+producerHelper##n.SetAttribute("size", StringValue("14500000000"));\
 \
 \
 ndnGlobalRoutingHelper.AddOrigins("/dst"#n, producer##n);\
@@ -50,6 +50,7 @@ void queueSizeTrace(Ptr<Node> node) {
 int
 main(int argc, char *argv[]) {
   bool nullmsg = false;
+  //Config::SetDefault("ns3::PointToPointNetDevice::Mtu", UintegerValue(4000));
 
   // Read optional command-line parameters (e.g., enable visualizer with ./waf --run=<> --visualize
   CommandLine cmd;
@@ -72,7 +73,7 @@ main(int argc, char *argv[]) {
   uint32_t systemCount = MpiInterface::GetSize();
 
   AnnotatedTopologyReader topologyReader("", 25);
-  topologyReader.SetFileName("scenarios/topo-3-consumer.txt");
+  topologyReader.SetFileName("/home/developer/scenario-ndn-chunk/scenarios/topo-3-consumer.txt");
   topologyReader.Read();
 
   // Install NDN stack on all nodes
@@ -97,7 +98,7 @@ main(int argc, char *argv[]) {
   // Calculate and install FIBs
   ndn::GlobalRoutingHelper::CalculateRoutes();
 
-  Simulator::Stop(Seconds(300.0));
+  Simulator::Stop(Seconds(700.0));
 
   if (systemId == 4) {
     int fd = open("queueTrace.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);

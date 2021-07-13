@@ -52,6 +52,8 @@ main(int argc, char *argv[]) {
   Config::SetDefault("ns3::PointToPointNetDevice::DataRate", StringValue("1Gbps"));
   Config::SetDefault("ns3::PointToPointChannel::Delay", StringValue("30ms"));
   Config::SetDefault("ns3::QueueBase::MaxSize", StringValue("900p"));
+  Config::SetDefault("ns3::PointToPointNetDevice::Mtu", UintegerValue(9000));
+
 
   // Read optional command-line parameters (e.g., enable visualizer with ./waf --run=<> --visualize
   CommandLine cmd;

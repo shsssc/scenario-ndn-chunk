@@ -172,13 +172,14 @@ private:
     const int WAIT_STATE = 0;
     const int GOTBACK_STATE = 1;
     const int HOLDON_STATE = 2;
-    const double allowedPacketerror = .6;
+    const double allowedPacketerror = 0.6;
     const double tolerance = allowedPacketerror / m_rmn.measurementDelay() * 1000 / 200;
-    const int target_RTT = 120;
+    const int target_RTT = -1;
     const int makeup_stages =
             m_sc.getMinRTT() < 0 || target_RTT <= m_sc.getMinRTT() ? 0 : target_RTT - m_sc.getMinRTT();
     if (finished()) return;
     m_scheduler.schedule(time::microseconds(1000), [this] { rateStateMachineNew(); });
+    m_sc.tic();
 
     if (m_adjustmentState == WAIT_STATE && m_lastProbeSegment < m_highAcked) {
       //just got back
@@ -186,6 +187,7 @@ private:
       m_adjustmentState = GOTBACK_STATE;
       resetRate();
       m_rmn.nextStage(m_last_bs);//we do not use data for this interval since its transition
+      /*
       if (m_sc.shouldDecrease()) {
         std::cerr << "!!!!!!!!!SC DECREASE" << std::endl;
       }
@@ -195,7 +197,7 @@ private:
         cubicDecrease();
         m_rmn.reportDecrease();
         std::cerr << m_last_bs << ",!!!!!!!earlyDecrease " << m_last_bs << std::endl;
-      }
+      }*/
       return;
     }
     m_overshootFor++;
@@ -226,7 +228,7 @@ private:
 
 
     if (m_adjustmentState == GOTBACK_STATE) {
-      if (compare(rate, m_burstSz, tolerance)) {
+      if (compare(rate, m_burstSz, tolerance) && m_sc.shouldDecrease()) {
         m_adjustmentState = HOLDON_STATE;
       } else {
         m_adjustmentState = WAIT_STATE;//rate must change once ready
@@ -243,7 +245,7 @@ private:
 
     //m_adjustmentState == WAIT_STATE
     //we are waiting for probe to get back
-    if (compare(rate, m_last_bs, tolerance)) {
+    if (compare(rate, m_last_bs, tolerance) && m_sc.shouldDecrease()) {
       //m_adjustmentState = WAIT_STATE;//rate must change once ready
       m_adjustmentState = HOLDON_STATE;
       std::cerr << rate << ",lastdecrease " << m_last_bs << std::endl;

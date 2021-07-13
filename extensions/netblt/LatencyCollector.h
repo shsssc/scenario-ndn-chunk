@@ -22,10 +22,11 @@
 
 class LatencyCollector {
   const uint32_t threshold = 4000000;//2ms
-  uint32_t averageInterval = 20;
-  uint32_t history = 25;
-  uint32_t minHistorySize = 22;
-  std::list<uint64_t> tmpList;
+  uint32_t averageInterval = 9;
+  uint32_t history = 7;
+  uint32_t minHistorySize = 6;
+  //std::list<uint64_t> tmpList;
+  double tmpVal = 0;
   std::list<uint64_t> statsList;
   bool hasNotChecked;
   int min_rtt = -1;
@@ -39,41 +40,56 @@ public:
   }
 
   void report(uint64_t time) {
-    tmpList.push_back(time);
-    if (tmpList.size() < averageInterval) return;
-    uint64_t sum = 0;
-    for (uint64_t i : tmpList) {
-      sum += i;
-    }
-    sum /= tmpList.size();
+    //tmpList.push_back(time);
+    //if (tmpList.size() < averageInterval) return;
+    //uint64_t sum = 0;
+    //for (uint64_t i : tmpList) {
+    //  sum += i;
+    // }
+    //sum /= tmpList.size();
     //std::cerr << "average: " << sum << std::endl;
-    statsList.push_back(sum);
-    tmpList.clear();
+    tmpVal = tmpVal * 0.8 + time * 0.2;
+    //statsList.push_back(sum);
+    //tmpList.clear();
+    //while (statsList.size() > history) statsList.pop_front();
+    //hasNotChecked = true;
+  }
+
+  void tic() {
+    statsList.push_back(tmpVal);
     while (statsList.size() > history) statsList.pop_front();
     hasNotChecked = true;
   }
 
   bool shouldDecrease() {
-    return false;
     if (!hasNotChecked) return false;
     if (statsList.size() < minHistorySize) return false;
     //std::cerr << minInterval() << std::endl;
-    if (*statsList.rbegin() > minInterval() + threshold) {
-      return true;
-    } else {
-      return false;
-    }
+    //if (*statsList.rbegin() > minInterval() + threshold) {
+    //  return true;
+    //} else {
+    //  return false;
+    //}
     hasNotChecked = false;
+    auto diff = *statsList.rbegin() - *statsList.begin();
+    if (diff < 50000) return false;
     auto i = statsList.rbegin();
     uint32_t nextTime = *i;
     i++;
+    std::cerr << '[';
+    for (auto i :statsList) {
+      std::cerr << i << ',';
+    }
+    std::cerr << ']' << std::endl;
+    int tolerance = 2;
     for (int j = 0; j < minHistorySize - 1; j++) {
-      if (*i > nextTime) return false;
+      if (*i > nextTime) tolerance--;
       nextTime = *i;
       i++;
     }
-    statsList.push_back(1 << 31);//add a large number to "break"
-    return true;
+    //we comment this line since we are using another mechanism to prevent keep breaking
+    //statsList.push_back(1 << 31);//add a large number to "break"
+    return tolerance >= 0;
   }
 
   bool hasData() {
@@ -91,7 +107,7 @@ public:
 
   void clear() {
     statsList.clear();
-    tmpList.clear();
+    //tmpList.clear();
   }
 
 };
