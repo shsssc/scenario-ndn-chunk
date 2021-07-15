@@ -42,6 +42,10 @@ public:
 
 private:
 
+  unsigned windowSize() {
+    return m_inNetworkPkt.size();
+  }
+
   void checkRto();
 
   /**
@@ -166,6 +170,71 @@ private:
     m_recvCount = 0;
     m_lastRecvCheckpoint = time::steady_clock::now();
     m_rateCollected__ = 0;
+  }
+
+  void rateStateMachine() {
+    const int targetOvershoot = 15;
+    if (finished()) return;
+    m_scheduler.schedule(time::microseconds(1000), [this] { rateStateMachine(); });
+    m_sc.tic();
+    if (m_sc.minInterval() == -1)return;
+    if (m_rmn.ready() == false)return;
+
+    //only control if the receiving rate has updated
+    if (m_lastProbeSegment > m_highAcked)return;
+    m_lastProbeSegment = m_highRequested + m_rmn.averageSize();
+
+    //calculate overshoot
+    double min_rtt = m_sc.minInterval();
+    double rate = m_rmn.getRate1() / 5;
+    //std::cerr << rate << "," << min_rtt << "," << "calculated window" << min_rtt * rate << "real_window" << windowSize()
+    //          << std::endl;
+    double overShoot = windowSize() - min_rtt * rate;
+
+    //PID controller
+    double overShootTarget = 5;
+    double e = overShootTarget - overShoot;
+    static double prev_e;
+    const double d = e - prev_e;
+    prev_e = e;
+
+    //exponential slow start
+    static bool startedUp;
+    if (!startedUp && e > overShootTarget * 0.7) {
+      m_burstSz *= pow(2, min_rtt / 1000);//double rate each second
+      return;
+    } else if (!startedUp) {
+      startedUp = true;
+      std::cerr << "started up with burst size" << m_burstSz << std::endl;
+    }
+
+    static double i;
+    static std::list<double> i_history;
+    const short ilimit = 20;
+    static int consecutiveBelowCount;
+    static int consecutiveAboveCount;
+    if (e > 0) {
+      consecutiveAboveCount++;
+      consecutiveBelowCount = 0;
+    } else if (e < 0) {
+      consecutiveBelowCount++;
+      consecutiveAboveCount = 0;
+    }
+    const int historyOffset = (consecutiveAboveCount > consecutiveBelowCount) ?
+                              consecutiveAboveCount : consecutiveBelowCount;
+    i_history.push_back(e);
+    i += e;
+
+    while (i_history.size() > ilimit + historyOffset) {
+      i -= i_history.front();
+      i_history.pop_front();
+    }
+
+    m_burstSz += (i * 0.002 / min_rtt * 50 + e * 0.05 + d * 0.02) / min_rtt * 60;
+
+
+    std::cerr << overShoot - overShootTarget << ',' << m_burstSz << std::endl;
+
   }
 
   void rateStateMachineNew() {

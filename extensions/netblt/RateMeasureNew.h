@@ -19,8 +19,17 @@ class RateMeasureNew {
   unsigned short stageHistorySize = 5;
   unsigned stagePacketCount = 0;
   double totalMismatch = 0;
+  int pktHistory = 60;
+
+  std::vector<double> rate_history;
+  uint32_t rate_history_size;
+
 public:
   RateMeasureNew() {
+  }
+
+  int averageSize(){
+    return pktHistory;
   }
 
   unsigned short measurementDelay() {
@@ -34,13 +43,13 @@ public:
 
   void reportPacket(uint64_t t) {
     time_history.push_back(t);
-    if (ready()) {
+    if (time_history.size()>pktHistory) {
       time_history.pop_front();
     }
   }
 
   double getRate1() const {
-    if (msHistory.size() < msHistorySize) return 0;
+    //if (msHistory.size() < msHistorySize) return 0;
     auto r = *time_history.rbegin();
     auto l = *time_history.begin();
     auto sz = time_history.size();
@@ -59,7 +68,8 @@ public:
   }
 
   bool ready() {
-    return msHistory.size() >= msHistorySize;
+    //return msHistory.size() >= msHistorySize;
+    return time_history.size() >= pktHistory;
   }
 
   unsigned size() {

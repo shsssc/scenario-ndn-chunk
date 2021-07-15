@@ -26,10 +26,10 @@ class LatencyCollector {
   uint32_t history = 7;
   uint32_t minHistorySize = 6;
   //std::list<uint64_t> tmpList;
-  double tmpVal = 0;
+  double tmpVal = -1;
   std::list<uint64_t> statsList;
   bool hasNotChecked;
-  int min_rtt = -1;
+  double min_rtt = -1.;
 public:
   int getMinRTT() {
     return min_rtt;
@@ -48,14 +48,17 @@ public:
     // }
     //sum /= tmpList.size();
     //std::cerr << "average: " << sum << std::endl;
-    tmpVal = tmpVal * 0.8 + time * 0.2;
-    //statsList.push_back(sum);
+    if (tmpVal==-1)tmpVal=time;
+    else{
+      tmpVal = tmpVal * 0.8 + time * 0.2;
+    }//statsList.push_back(sum);
     //tmpList.clear();
     //while (statsList.size() > history) statsList.pop_front();
     //hasNotChecked = true;
   }
 
   void tic() {
+    if (tmpVal<0)return;
     statsList.push_back(tmpVal);
     while (statsList.size() > history) statsList.pop_front();
     hasNotChecked = true;
@@ -96,13 +99,15 @@ public:
     return !statsList.empty();
   }
 
-  uint64_t minInterval() {
+  double minInterval() {
+    if (min_rtt > 0.) return min_rtt;//todo
+    if (statsList.empty())return min_rtt;
     uint64_t min = statsList.front();
     for (auto i : statsList) {
       if (i < min) min = i;
     }
-    min_rtt = min / 1000000;
-    return min;
+    min_rtt = min / 1000000.;
+    return min_rtt;
   }
 
   void clear() {

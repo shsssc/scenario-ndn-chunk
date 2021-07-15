@@ -84,7 +84,7 @@ void ndn::NetBLTApp::run() {
     m_versionedName = versionedName;
     fetchLoop();
     checkRto();
-    rateStateMachineNew();
+    rateStateMachine();
   });
   m_dv->onDiscoveryFailure.connect([](const std::string &msg) {
     std::cout << msg;
