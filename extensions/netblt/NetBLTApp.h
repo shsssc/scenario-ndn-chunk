@@ -173,7 +173,6 @@ private:
   }
 
   void rateStateMachine() {
-    const int targetOvershoot = 15;
     if (finished()) return;
     m_scheduler.schedule(time::microseconds(1000), [this] { rateStateMachine(); });
     m_sc.tic();
@@ -192,7 +191,7 @@ private:
     double overShoot = windowSize() - min_rtt * rate;
 
     //PID controller
-    double overShootTarget = 5;
+    double overShootTarget = 8;
     double e = overShootTarget - overShoot;
     static double prev_e;
     const double d = e - prev_e;

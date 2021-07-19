@@ -24,7 +24,7 @@ consumerHelper##n.SetAttribute("logfile", StringValue("consumer_"#n".log"));\
 }\
 \
 auto app##n = consumerHelper##n.Install(consumer##n);\
-app##n.Start(Seconds(1+n));\
+app##n.Start(Seconds(1+3*n));\
 \
 ndn::AppHelper producerHelper##n("PutChunks");\
 producerHelper##n.SetAttribute("Prefix", StringValue("/dst"#n));\

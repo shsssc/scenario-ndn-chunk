@@ -48,8 +48,8 @@ public:
     // }
     //sum /= tmpList.size();
     //std::cerr << "average: " << sum << std::endl;
-    if (tmpVal==-1)tmpVal=time;
-    else{
+    if (tmpVal == -1)tmpVal = time;
+    else {
       tmpVal = tmpVal * 0.8 + time * 0.2;
     }//statsList.push_back(sum);
     //tmpList.clear();
@@ -58,7 +58,7 @@ public:
   }
 
   void tic() {
-    if (tmpVal<0)return;
+    if (tmpVal < 0)return;
     statsList.push_back(tmpVal);
     while (statsList.size() > history) statsList.pop_front();
     hasNotChecked = true;
@@ -100,13 +100,13 @@ public:
   }
 
   double minInterval() {
-    if (min_rtt > 0.) return min_rtt;//todo
-    if (statsList.empty())return min_rtt;
+
+    if (statsList.empty()) return min_rtt;
     uint64_t min = statsList.front();
     for (auto i : statsList) {
       if (i < min) min = i;
     }
-    min_rtt = min / 1000000.;
+    min_rtt = min_rtt > 0 && min_rtt <= min / 1000000. ? min_rtt : min / 1000000.;
     return min_rtt;
   }
 
