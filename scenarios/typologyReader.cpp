@@ -91,7 +91,7 @@ main(int argc, char *argv[]) {
     consumerHelper1.SetAttribute("logfile", StringValue("consumer1.log"));
     //ndn::L3RateTracer::Install(consumer2, "consumer2.txt", Seconds(0.2));
   }
-  consumerHelper1.Install(consumer2).Start(Seconds(6.61));
+  consumerHelper1.Install(consumer2).Start(Seconds(6.21));
 
 
   ndn::AppHelper producerHelper("PutChunks");
