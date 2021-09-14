@@ -61,9 +61,7 @@ ndn::NetBLTApp::NetBLTApp(std::string s) : m_nextSegment(0), m_prefix(std::move(
                                            m_retransmissionCount(0), m_startTime(), m_lastSegment(0),
                                            m_highRequested(0),
                                            m_lastProbeSegment(0), m_highAcked(0), m_sc(), m_adjustmentState(0),
-                                           m_scheduler(m_face.getIoService()),
-                                           m_overshoot(m_rmn, m_sc, m_burstSz, *this, m_scheduler, m_highRequested,
-                                                       m_lastProbeSegment, m_highAcked, m_inNetworkPkt) {
+                                           m_scheduler(m_face.getIoService()) {
   m_dv = make_unique<chunks::DiscoverVersion>(m_face, m_prefix, m_optVD);
   m_SOSSz = m_options.m_SOSSz;
   m_burstSz = m_options.m_burstSz;
@@ -86,9 +84,8 @@ void ndn::NetBLTApp::run() {
     m_versionedName = versionedName;
     fetchLoop();
     checkRto();
-    m_overshoot.run();
+    rateStateMachineNew();
   });
-
   m_dv->onDiscoveryFailure.connect([](const std::string &msg) {
     std::cout << msg;
     NDN_THROW(std::runtime_error(msg));
@@ -192,8 +189,6 @@ void ndn::NetBLTApp::fetchLoop() {
   //ns3::Simulator::Schedule(ns3::MilliSeconds(m_burstInterval_ms), &NetBLTApp::fetchLoop, this);
   m_scheduler.schedule(time::nanoseconds((unsigned) (m_burstInterval_ms.count() * 1000000 / m_burstSz)),
                        [this] { fetchLoop(); });
-  //std::cerr << "fetch_time"
-  //          << m_burstSz<< std::endl;
 }
 
 void ndn::NetBLTApp::handleData(const ndn::Interest &interest, const ndn::Data &data) {

@@ -21,7 +21,6 @@
 #include "LatencyCollector.h"
 #include "RateCollector.h"
 #include "RateMeasureNew.h"
-#include "OvershootStateMachine.h"
 
 namespace ndn {
 struct SegmentInfo {
@@ -40,13 +39,8 @@ public:
 
   void run();
 
-  bool finished() const;
 
 private:
-
-  unsigned windowSize() {
-    return m_inNetworkPkt.size();
-  }
 
   void checkRto();
 
@@ -71,6 +65,7 @@ private:
 
   void outputData();
 
+  bool finished() const;
 
   /**
    * this is deprecated.
@@ -112,7 +107,7 @@ private:
       // If wmax is still 0, set it to the current cwnd. Usually unnecessary,
       // if m_ssthresh is large enough.
       if (m_wmax < m_options.initCwnd) {
-        m_wmax = m_burstSz / m_options.cubicBeta; //todo
+        m_wmax = m_burstSz;// / m_options.cubicBeta; //todo
       }
 
       // 1. Time since last congestion event in seconds
@@ -173,10 +168,94 @@ private:
     m_rateCollected__ = 0;
   }
 
-  void rateStateMachine() {
+  void rateStateMachineNew() {
+    const int roundLenght = 55;
+    static int currentRound;
+    const int WAIT_STATE = 0;
+    const int GOTBACK_STATE = 1;
+    const int HOLDON_STATE = 2;
+    const double allowedPacketerror = 1.2;
+    const double tolerance = allowedPacketerror / m_rmn.measurementDelay() * 1000 / 200;
+    const int target_RTT = 0;
+    const int makeup_stages =
+            m_sc.getMinRTT() < 0 || target_RTT <= m_sc.getMinRTT() ? 0 : target_RTT - m_sc.getMinRTT();
+    if (finished()) return;
+    m_scheduler.schedule(time::microseconds(1000), [this] { rateStateMachineNew(); });
+
+    if (m_adjustmentState == WAIT_STATE && currentRound>=roundLenght) {
+      //just got back
+      m_makeupCount = 0;
+      currentRound = 0;
+      m_adjustmentState = GOTBACK_STATE;
+      resetRate();
+      m_rmn.nextStage(m_last_bs);//we do not use data for this interval since its transition
+      /*
+      if (m_sc.shouldDecrease()) {
+        std::cerr << "!!!!!!!!!SC DECREASE" << std::endl;
+      }
+      if (m_sc.shouldDecrease()) {
+        m_adjustmentState = WAIT_STATE;
+        m_lastProbeSegment = m_highRequested + 1;//aft
+        cubicDecrease();
+        m_rmn.reportDecrease();
+        std::cerr << m_last_bs << ",!!!!!!!earlyDecrease " << m_last_bs << std::endl;
+      }
+       */
+      return;
+    }
+
+    //run makeup
+    if (m_adjustmentState == HOLDON_STATE) {
+      //if (m_makeupCount == 0)m_burstSz += tolerance * 2;
+      m_makeupCount++;
+      if (m_makeupCount >= makeup_stages /*m_overshootFor >= 40*/) {
+        //std::cerr << "!!!!! Over shoot for" << m_overshootFor <<" min_RTT"<<m_sc.getMinRTT()  <<std::endl;
+        cubicDecrease();
+        m_adjustmentState = WAIT_STATE;//rate must change once ready
+        m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
+        m_rmn.reportDecrease();
+        resetRate();
+        currentRound = 0;
+      }
+      return;
+    }
+
+    m_rmn.reportReceived(m_recvCount);
+    resetRate();
+
+    double rate = m_rateCollected__ = m_rmn.getRate1();
+    if (!m_rmn.ready())return;
+    //we have at least waited measurement window size
+
+
+
+    //just got back, either increase or decrease
+    if (m_adjustmentState == GOTBACK_STATE) {
+      if (compare(rate, m_burstSz, tolerance)) {
+        m_adjustmentState = HOLDON_STATE;
+      } else {
+        m_adjustmentState = WAIT_STATE;
+        m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
+        currentRound=0;
+        m_last_bs = m_burstSz;
+        cubicIncrease();
+      }
+      std::cerr << rate << ",current " << m_burstSz << std::endl;
+
+      return;
+    }
+
+    //m_adjustmentState == WAIT_STATE
+    //we are waiting for probe to get back
+    currentRound++;
+    if (compare(rate, m_last_bs, tolerance)) {
+      //m_adjustmentState = WAIT_STATE;//rate must change once ready
+      m_adjustmentState = HOLDON_STATE;
+      std::cerr << rate << ",lastdecrease " << m_last_bs << std::endl;
+      //next wait_state will not adjust
+    }
 
   }
-
 
   //above is rate based control
   //---------------------------
@@ -246,10 +325,6 @@ private:
   //cubic
   double m_wmax = 0.0; ///< window size before last window decrease
   double m_lastWmax = 0.0; ///< last wmax
-
-  //BBR
-  //BBRStateMachine m_bbr;
-  OvershootStateMachine m_overshoot;
 };
 }
 

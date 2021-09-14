@@ -22,17 +22,13 @@
 
 class LatencyCollector {
   const uint32_t threshold = 4000000;//2ms
-  uint32_t averageInterval = 9;
-  uint32_t historySize = 100;
-  uint32_t minHistorySize = 6;
-  //std::list<uint64_t> tmpList;
-  double tmpVal = -1;
+  uint32_t averageInterval = 20;
+  uint32_t history = 25;
+  uint32_t minHistorySize = 22;
+  std::list<uint64_t> tmpList;
   std::list<uint64_t> statsList;
   bool hasNotChecked;
-  double min_rtt = -1.;
-  int lastUpdateCounter = 0;
-  std::list<double> tocList;
-  const unsigned RTT_HISTORY_SIZE = 10;
+  int min_rtt = -1;
 public:
   int getMinRTT() {
     return min_rtt;
@@ -43,67 +39,59 @@ public:
   }
 
   void report(uint64_t time) {
-
-    if (tmpVal == -1)tmpVal = time;
-    else {
-      tmpVal = tmpVal * 0.9 + time * 0.1;
+    tmpList.push_back(time);
+    if (tmpList.size() < averageInterval) return;
+    uint64_t sum = 0;
+    for (uint64_t i : tmpList) {
+      sum += i;
     }
-  }
-
-  double getVal(){
-    return tmpVal/1000000.;
-  }
-
-  void tic() {
-    lastUpdateCounter++;
-    if (tmpVal < 0)return;
-    statsList.push_back(tmpVal);
-    while (statsList.size() > historySize) statsList.pop_front();
+    sum /= tmpList.size();
+    //std::cerr << "average: " << sum << std::endl;
+    statsList.push_back(sum);
+    tmpList.clear();
+    while (statsList.size() > history) statsList.pop_front();
     hasNotChecked = true;
   }
 
-  bool shouldProbeRTT() {
-    lastUpdateCounter++;
-    if (!ready())return false;
-    if (tmpVal == -1) return false;
-    double min = tmpVal / 1000000.;
-
-    if (min < min_rtt - 0.01 || min_rtt < 0) {
-      min_rtt = min;
-      lastUpdateCounter = 0;
-      std::cerr << "[delay]got a better min_rtt" << std::endl;
+  bool shouldDecrease() {
+    return false;
+    if (!hasNotChecked) return false;
+    if (statsList.size() < minHistorySize) return false;
+    //std::cerr << minInterval() << std::endl;
+    if (*statsList.rbegin() > minInterval() + threshold) {
+      return true;
+    } else {
       return false;
     }
-
-    if (lastUpdateCounter > 5000) {
-      //expired, we update value
-      min_rtt = min;
-      lastUpdateCounter = 0;
-      std::cerr << "[delay] timeout min_RTT" << std::endl;
-      return true;
+    hasNotChecked = false;
+    auto i = statsList.rbegin();
+    uint32_t nextTime = *i;
+    i++;
+    for (int j = 0; j < minHistorySize - 1; j++) {
+      if (*i > nextTime) return false;
+      nextTime = *i;
+      i++;
     }
-
-    //have not expired, get a larger sample
-    return false;
+    statsList.push_back(1 << 31);//add a large number to "break"
+    return true;
   }
 
-  bool ready() const {
-    return tmpVal > 0;
+  bool hasData() {
+    return !statsList.empty();
   }
 
-  double minInterval() {
-
-    if (statsList.empty()) return min_rtt;
+  uint64_t minInterval() {
     uint64_t min = statsList.front();
     for (auto i : statsList) {
       if (i < min) min = i;
     }
-    min_rtt = min_rtt > 0 && min_rtt <= min / 1000000. ? min_rtt : min / 1000000.;
-    return min_rtt;
+    min_rtt = min / 1000000;
+    return min;
   }
 
   void clear() {
     statsList.clear();
+    tmpList.clear();
   }
 
 };

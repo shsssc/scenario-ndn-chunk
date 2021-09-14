@@ -54,9 +54,27 @@ main(int argc, char *argv[]) {
   topologyReader.Read();
 
   // Install NDN stack on all nodes
-  ndn::StackHelper ndnHelper;
-  ndnHelper.SetDefaultRoutes(true);
-  ndnHelper.InstallAll();
+  ndn::StackHelper ndnHelper_cs;
+  ndnHelper_cs.SetDefaultRoutes(true);
+  ndnHelper_cs.setCsSize(10000);
+
+  ndn::StackHelper ndnHelper_default;
+  ndnHelper_default.SetDefaultRoutes(true);
+
+
+  // Getting containers for the consumer/producer
+  Ptr<Node> consumer1 = Names::Find<Node>("Src1");
+  Ptr<Node> consumer2 = Names::Find<Node>("Src2");
+
+  Ptr<Node> producer1 = Names::Find<Node>("Dst1");
+  Ptr<Node> producer2 = Names::Find<Node>("Dst2");
+
+  ndnHelper_default.Install(consumer1);
+  ndnHelper_default.Install(consumer2);
+  ndnHelper_default.Install(producer1);
+  ndnHelper_default.Install(producer2);
+  ndnHelper_default.Install(Names::Find<Node>("Rtr2"));
+  ndnHelper_cs.Install(Names::Find<Node>("Rtr1"));
 
   // Choosing forwarding strategy
   ndn::StrategyChoiceHelper::InstallAll("/prefix", "/localhost/nfd/strategy/best-route");
@@ -65,12 +83,8 @@ main(int argc, char *argv[]) {
   ndn::GlobalRoutingHelper ndnGlobalRoutingHelper;
   ndnGlobalRoutingHelper.InstallAll();
 
-  // Getting containers for the consumer/producer
-  Ptr<Node> consumer1 = Names::Find<Node>("Src1");
-  Ptr<Node> consumer2 = Names::Find<Node>("Src2");
 
-  Ptr<Node> producer1 = Names::Find<Node>("Dst1");
-  Ptr<Node> producer2 = Names::Find<Node>("Dst2");
+
   ndn::AppHelper consumerHelper("NetBLT");
   ndn::AppHelper consumerHelper1("NetBLT");
 
@@ -86,21 +100,21 @@ main(int argc, char *argv[]) {
 
   // on the second consumer node install a Consumer application
   // that will express interests in /dst2 namespace
-  consumerHelper1.SetAttribute("Prefix", StringValue("/dst2"));
+  consumerHelper1.SetAttribute("Prefix", StringValue("/dst1"));
   if (systemId == 1) {
     consumerHelper1.SetAttribute("logfile", StringValue("consumer1.log"));
     //ndn::L3RateTracer::Install(consumer2, "consumer2.txt", Seconds(0.2));
   }
-  consumerHelper1.Install(consumer2).Start(Seconds(6.21));
+  consumerHelper1.Install(consumer2).Start(Seconds(2.223));
 
 
   ndn::AppHelper producerHelper("PutChunks");
   producerHelper.SetAttribute("Prefix", StringValue("/dst1"));
-  producerHelper.SetAttribute("size", StringValue("6000000000"));
+  producerHelper.SetAttribute("size", StringValue("10000000000"));
 
   ndn::AppHelper producerHelper1("PutChunks");
   producerHelper1.SetAttribute("Prefix", StringValue("/dst2"));
-  producerHelper1.SetAttribute("size", StringValue("6000000000"));
+  producerHelper1.SetAttribute("size", StringValue("10000000000"));
 
   // Register /dst1 prefix with global routing controller and
   // install producer that will satisfy Interests in /dst1 namespace
@@ -117,7 +131,7 @@ main(int argc, char *argv[]) {
   // Calculate and install FIBs
   ndn::GlobalRoutingHelper::CalculateRoutes();
 
-  Simulator::Stop(Seconds(300.0));
+  Simulator::Stop(Seconds(600.0));
 
   if (systemId == 5) {
     int fd = open("queueTrace.txt", O_WRONLY | O_CREAT | O_TRUNC, 0666);

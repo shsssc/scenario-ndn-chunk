@@ -15,21 +15,12 @@ class RateMeasureNew {
   std::list<uint64_t> time_history;
   std::vector<unsigned> msHistory;
   const unsigned short minHistory = 50;
-  unsigned short msHistorySize = 30;
+  unsigned short msHistorySize = 15;
   unsigned short stageHistorySize = 5;
   unsigned stagePacketCount = 0;
   double totalMismatch = 0;
-  int pktHistory = 60;
-
-  std::vector<double> rate_history;
-  uint32_t rate_history_size;
-
 public:
   RateMeasureNew() {
-  }
-
-  int averageSize(){
-    return pktHistory;
   }
 
   unsigned short measurementDelay() {
@@ -43,13 +34,12 @@ public:
 
   void reportPacket(uint64_t t) {
     time_history.push_back(t);
-    if (time_history.size()>pktHistory) {
+    if (ready()) {
       time_history.pop_front();
     }
   }
 
   double getRate1() const {
-    //if (msHistory.size() < msHistorySize) return 0;
     auto r = *time_history.rbegin();
     auto l = *time_history.begin();
     auto sz = time_history.size();
@@ -58,18 +48,17 @@ public:
   }
 
   void reportReceived(unsigned count) {
-    stagePacketCount += count;
-    msHistory.push_back(count);
+    //stagePacketCount += count;
+    msHistory.push_back(0);
     if (msHistory.size() > msHistorySize) {
-      auto tmp = msHistory[msHistory.size() - msHistorySize - 1];
-      stagePacketCount -= tmp;
+      //auto tmp = msHistory[msHistory.size() - msHistorySize - 1];
+      //stagePacketCount -= tmp;
       //msHistory.pop_front();
     }
   }
 
   bool ready() {
-    //return msHistory.size() >= msHistorySize;
-    return time_history.size() >= pktHistory;
+    return msHistory.size() >= msHistorySize;
   }
 
   unsigned size() {
@@ -77,7 +66,6 @@ public:
   }
 
   double getRate(short unit = 5) const {
-    if (msHistory.size() < msHistorySize) return 0;
     return (double) stagePacketCount / msHistorySize * unit;
   }
 
