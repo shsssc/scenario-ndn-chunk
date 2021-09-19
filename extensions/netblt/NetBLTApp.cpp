@@ -49,7 +49,7 @@ void ndn::NetBLTApp::outputData() {
     const Block &content = it->second->getContent();
     m_bytesTransfered += content.value_size();
     //std::cerr << "acked " << m_nextToPrint << std::endl;
-    //std::cerr.write(reinterpret_cast<const char*>(content.value()), content.value_size());
+    //std::cerr.write(reinterpret_cast<const char*>(content.latencyNs()), content.value_size());
   }
 }
 

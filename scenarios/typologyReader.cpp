@@ -56,7 +56,7 @@ main(int argc, char *argv[]) {
   // Install NDN stack on all nodes
   ndn::StackHelper ndnHelper_cs;
   ndnHelper_cs.SetDefaultRoutes(true);
-  ndnHelper_cs.setCsSize(10000);
+  ndnHelper_cs.setCsSize(9000000);
 
   ndn::StackHelper ndnHelper_default;
   ndnHelper_default.SetDefaultRoutes(true);
@@ -105,16 +105,16 @@ main(int argc, char *argv[]) {
     consumerHelper1.SetAttribute("logfile", StringValue("consumer1.log"));
     //ndn::L3RateTracer::Install(consumer2, "consumer2.txt", Seconds(0.2));
   }
-  consumerHelper1.Install(consumer2).Start(Seconds(2.223));
+  consumerHelper1.Install(consumer2).Start(Seconds(5.223));
 
 
   ndn::AppHelper producerHelper("PutChunks");
   producerHelper.SetAttribute("Prefix", StringValue("/dst1"));
-  producerHelper.SetAttribute("size", StringValue("10000000000"));
+  producerHelper.SetAttribute("size", StringValue("4000000000"));
 
   ndn::AppHelper producerHelper1("PutChunks");
   producerHelper1.SetAttribute("Prefix", StringValue("/dst2"));
-  producerHelper1.SetAttribute("size", StringValue("10000000000"));
+  producerHelper1.SetAttribute("size", StringValue("4000000000"));
 
   // Register /dst1 prefix with global routing controller and
   // install producer that will satisfy Interests in /dst1 namespace

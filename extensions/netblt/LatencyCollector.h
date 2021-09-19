@@ -6,92 +6,77 @@
 #define EXTENSIONS_LATENCYCOLLECTOR_H
 
 #include <string>
-#include "ns3/ndnSIM/ndn-cxx/face.hpp"
 #include <ndn-cxx/util/rtt-estimator.hpp>
-#include "../cat/discover-version.hpp"
-#include "../cat/options.hpp"
 #include <iostream>
 #include <utility>
-#include <queue>
-#include <list>
-#include <set>
-#include <map>
-#include "ns3/scheduler.h"
-#include "options.h"
+#include <deque>
+
+
+#include "STL_mono_wedge.h"
+
+struct LatencyRecord {
+  int64_t latencyNs;
+  int64_t sampleTimeNs;
+
+  bool operator<(const LatencyRecord &o) const;
+
+  bool operator>(const LatencyRecord &o) const;
+};
+
+std::ostream &operator<<(std::ostream &os, const LatencyRecord &sample);
 
 
 class LatencyCollector {
-  const uint32_t threshold = 4000000;//2ms
-  uint32_t averageInterval = 20;
-  uint32_t history = 25;
-  uint32_t minHistorySize = 22;
-  std::list<uint64_t> tmpList;
-  std::list<uint64_t> statsList;
-  bool hasNotChecked;
-  int min_rtt = -1;
+  const int64_t windowSizeNs = 500000000;
+  std::deque<LatencyRecord> max_wedge;
+  std::deque<LatencyRecord> min_wedge;
 public:
   int getMinRTT() {
-    return min_rtt;
+    if (!hasData()) return -1;
+    return min_wedge.front().latencyNs/1000000;
+  }
+
+  int getMaxRTT(){
+    if (!hasData()) return -1;
+    return max_wedge.front().latencyNs/1000000;
+
   }
 
   LatencyCollector() {
-    hasNotChecked = true;
   }
 
   void report(uint64_t time) {
-    tmpList.push_back(time);
-    if (tmpList.size() < averageInterval) return;
-    uint64_t sum = 0;
-    for (uint64_t i : tmpList) {
-      sum += i;
+    int64_t now = ndn::time::steady_clock::now().time_since_epoch().count();
+    LatencyRecord record = {static_cast<int64_t>(time),
+                            now};
+    mono_wedge::max_wedge_update(max_wedge, record);
+    mono_wedge::min_wedge_update(min_wedge, record);
+
+    while (now > windowSizeNs &&
+           max_wedge.front().sampleTimeNs <= now - windowSizeNs &&
+           max_wedge.size() > 1) {
+      max_wedge.pop_front();
     }
-    sum /= tmpList.size();
-    //std::cerr << "average: " << sum << std::endl;
-    statsList.push_back(sum);
-    tmpList.clear();
-    while (statsList.size() > history) statsList.pop_front();
-    hasNotChecked = true;
+
+    while (now > windowSizeNs &&
+           min_wedge.front().sampleTimeNs <= now - windowSizeNs &&
+           min_wedge.size() > 1) {
+      min_wedge.pop_front();
+    }
+
   }
 
-  bool shouldDecrease() {
-    return false;
-    if (!hasNotChecked) return false;
-    if (statsList.size() < minHistorySize) return false;
-    //std::cerr << minInterval() << std::endl;
-    if (*statsList.rbegin() > minInterval() + threshold) {
-      return true;
-    } else {
-      return false;
-    }
-    hasNotChecked = false;
-    auto i = statsList.rbegin();
-    uint32_t nextTime = *i;
-    i++;
-    for (int j = 0; j < minHistorySize - 1; j++) {
-      if (*i > nextTime) return false;
-      nextTime = *i;
-      i++;
-    }
-    statsList.push_back(1 << 31);//add a large number to "break"
-    return true;
-  }
 
   bool hasData() {
-    return !statsList.empty();
+    return !min_wedge.empty() && !max_wedge.empty();
   }
 
   uint64_t minInterval() {
-    uint64_t min = statsList.front();
-    for (auto i : statsList) {
-      if (i < min) min = i;
-    }
-    min_rtt = min / 1000000;
-    return min;
+
   }
 
   void clear() {
-    statsList.clear();
-    tmpList.clear();
+
   }
 
 };

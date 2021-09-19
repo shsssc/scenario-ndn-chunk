@@ -169,12 +169,12 @@ private:
   }
 
   void rateStateMachineNew() {
-    const int roundLenght = 55;
+    const int roundLength = m_rmn.measurementDelay() + (m_sc.hasData() ? m_sc.getMaxRTT() : 70);
     static int currentRound;
     const int WAIT_STATE = 0;
     const int GOTBACK_STATE = 1;
     const int HOLDON_STATE = 2;
-    const double allowedPacketerror = 1.2;
+    const double allowedPacketerror = .7;
     const double tolerance = allowedPacketerror / m_rmn.measurementDelay() * 1000 / 200;
     const int target_RTT = 0;
     const int makeup_stages =
@@ -182,25 +182,14 @@ private:
     if (finished()) return;
     m_scheduler.schedule(time::microseconds(1000), [this] { rateStateMachineNew(); });
 
-    if (m_adjustmentState == WAIT_STATE && currentRound>=roundLenght) {
+    if (m_adjustmentState == WAIT_STATE && currentRound >= roundLength) {
       //just got back
       m_makeupCount = 0;
       currentRound = 0;
       m_adjustmentState = GOTBACK_STATE;
       resetRate();
       m_rmn.nextStage(m_last_bs);//we do not use data for this interval since its transition
-      /*
-      if (m_sc.shouldDecrease()) {
-        std::cerr << "!!!!!!!!!SC DECREASE" << std::endl;
-      }
-      if (m_sc.shouldDecrease()) {
-        m_adjustmentState = WAIT_STATE;
-        m_lastProbeSegment = m_highRequested + 1;//aft
-        cubicDecrease();
-        m_rmn.reportDecrease();
-        std::cerr << m_last_bs << ",!!!!!!!earlyDecrease " << m_last_bs << std::endl;
-      }
-       */
+
       return;
     }
 
@@ -236,7 +225,7 @@ private:
       } else {
         m_adjustmentState = WAIT_STATE;
         m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
-        currentRound=0;
+        currentRound = 0;
         m_last_bs = m_burstSz;
         cubicIncrease();
       }

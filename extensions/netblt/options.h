@@ -19,7 +19,7 @@ struct Options {
 
     // Adaptive pipeline common options
     double initCwnd = 2.0;        ///< initial congestion window size
-    double initSsthresh = 5; ///< initial slow start threshold
+    double initSsthresh = 15; ///< initial slow start threshold
     time::milliseconds rtoCheckInterval{10}; ///< interval for checking retransmission timer
     bool ignoreCongMarks = false; ///< disable window decrease after receiving congestion mark
     bool disableCwa = false;      ///< disable conservative window adaptation
@@ -37,8 +37,8 @@ struct Options {
     uint32_t m_SOSSz = 15000;
 
     //flow
-    double m_burstSz = 10;
-    uint32_t m_minBurstSz = 5;
+    double m_burstSz = 1;
+    uint32_t m_minBurstSz = 1;
     time::milliseconds m_burstInterval_ms{5};
 
     //time

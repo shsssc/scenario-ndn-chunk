@@ -9,6 +9,7 @@ build/
 .idea
 cmake-build-debug/
 rate-trace.txt
-
+consumer*.log
+queueTrace.txt
 consumer*.txt
 consumer_*.txt
