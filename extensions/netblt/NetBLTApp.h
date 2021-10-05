@@ -21,6 +21,7 @@
 #include "LatencyCollector.h"
 #include "RateCollector.h"
 #include "RateMeasureNew.h"
+#include "SegmentOrderUtility.h"
 
 namespace ndn {
 struct SegmentInfo {
@@ -80,6 +81,18 @@ private:
 
   static bool compare(double a, double b, double tolerance) {
     return a - b < -tolerance;
+  }
+
+  static double getBeta(double recv, double send, double tolerance) {
+    if (recv - send >= -tolerance) return 0.7;
+    double ratio = (recv - send) / -tolerance;
+    if (ratio <= 1) {
+      std::cerr << "should not happen!!!!!!!!!!" << ratio << "recv: " <<
+                recv << "send: " << send << "tolerance:" << tolerance << std::endl;
+      return 0.9;
+    }
+    if (ratio >= 2) return 0.6;
+    return (ratio - 2) * (-0.9) + (ratio - 1) * (0.6);
   }
 
   void additiveIncrease() {
@@ -173,7 +186,7 @@ private:
     static int currentRound;
     const int WAIT_STATE = 0;
     const int GOTBACK_STATE = 1;
-    const int HOLDON_STATE = 2;
+    //const int HOLDON_STATE = 2;
     const double allowedPacketerror = .7;
     const double tolerance = allowedPacketerror / m_rmn.measurementDelay() * 1000 / 200;
     const int target_RTT = 0;
@@ -193,22 +206,6 @@ private:
       return;
     }
 
-    //run makeup
-    if (m_adjustmentState == HOLDON_STATE) {
-      //if (m_makeupCount == 0)m_burstSz += tolerance * 2;
-      m_makeupCount++;
-      if (m_makeupCount >= makeup_stages /*m_overshootFor >= 40*/) {
-        //std::cerr << "!!!!! Over shoot for" << m_overshootFor <<" min_RTT"<<m_sc.getMinRTT()  <<std::endl;
-        cubicDecrease();
-        m_adjustmentState = WAIT_STATE;//rate must change once ready
-        m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
-        m_rmn.reportDecrease();
-        resetRate();
-        currentRound = 0;
-      }
-      return;
-    }
-
     m_rmn.reportReceived(m_recvCount);
     resetRate();
 
@@ -221,7 +218,13 @@ private:
     //just got back, either increase or decrease
     if (m_adjustmentState == GOTBACK_STATE) {
       if (compare(rate, m_burstSz, tolerance)) {
-        m_adjustmentState = HOLDON_STATE;
+        m_options.cubicBeta = getBeta(rate, m_burstSz, tolerance);
+        cubicDecrease();
+        m_adjustmentState = WAIT_STATE;//rate must change once ready
+        m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
+        m_rmn.reportDecrease();
+        resetRate();
+        currentRound = 0;
       } else {
         m_adjustmentState = WAIT_STATE;
         m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
@@ -239,7 +242,14 @@ private:
     currentRound++;
     if (compare(rate, m_last_bs, tolerance)) {
       //m_adjustmentState = WAIT_STATE;//rate must change once ready
-      m_adjustmentState = HOLDON_STATE;
+      m_options.cubicBeta = getBeta(rate, m_last_bs, tolerance);
+
+      cubicDecrease();
+      m_adjustmentState = WAIT_STATE;//rate must change once ready
+      m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
+      m_rmn.reportDecrease();
+      resetRate();
+      currentRound = 0;
       std::cerr << rate << ",lastdecrease " << m_last_bs << std::endl;
       //next wait_state will not adjust
     }
@@ -314,6 +324,9 @@ private:
   //cubic
   double m_wmax = 0.0; ///< window size before last window decrease
   double m_lastWmax = 0.0; ///< last wmax
+
+  //reorder
+  SegmentOrderUtility m_reorderUtil;
 };
 }
 

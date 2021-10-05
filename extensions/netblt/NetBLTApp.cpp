@@ -152,7 +152,7 @@ bool ndn::NetBLTApp::expressOneInterest() {
     m_nextSegment++;
   }
   auto interest = Interest()
-          .setName(Name(m_versionedName).appendSegment(segToFetch))
+          .setName(Name(m_versionedName).appendSegment(m_reorderUtil.forward(segToFetch)))
           .setCanBePrefix(false)
           .setMustBeFresh(true)
           .setInterestLifetime(time::milliseconds(4000));
@@ -202,7 +202,7 @@ void ndn::NetBLTApp::handleData(const ndn::Interest &interest, const ndn::Data &
     std::cerr << "last segment: " << m_lastSegment << std::endl;
   }
   uint32_t segment = data.getName()[-1].toSegment();
-
+  segment = m_reorderUtil.backward(segment);
 
 
   //measure
@@ -232,6 +232,9 @@ void ndn::NetBLTApp::handleData(const ndn::Interest &interest, const ndn::Data &
   if (m_options.isVerbose) {
     std::cout << "ack, " << segment << "," << time::steady_clock::now().time_since_epoch().count() / 1000000. << ","
               << m_rateCollected__ //m_burstSz
+              << std::endl;
+    std::cout << "Rttvar, " << segment << "," << time::steady_clock::now().time_since_epoch().count() / 1000000. << ","
+              << m_sc.getHighPassFilterResult() //m_burstSz
               << std::endl;
   }
   if (segment > m_highAcked)m_highAcked = segment;
@@ -306,6 +309,7 @@ bool ndn::NetBLTApp::decreaseWindow(bool weak) {
 }
 
 bool ndn::NetBLTApp::fastRetransmission(uint32_t segment) {
+  return false;
   if (segment == m_nextToPrint) {
     //m_frtCounter = 0;
     return false;

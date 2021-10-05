@@ -10,7 +10,7 @@
 #include <iostream>
 #include <utility>
 #include <deque>
-
+#include <list>
 
 #include "STL_mono_wedge.h"
 
@@ -30,15 +30,17 @@ class LatencyCollector {
   const int64_t windowSizeNs = 500000000;
   std::deque<LatencyRecord> max_wedge;
   std::deque<LatencyRecord> min_wedge;
+  std::deque<uint64_t> history;
+
 public:
   int getMinRTT() {
     if (!hasData()) return -1;
-    return min_wedge.front().latencyNs/1000000;
+    return min_wedge.front().latencyNs / 1000000;
   }
 
-  int getMaxRTT(){
+  int getMaxRTT() {
     if (!hasData()) return -1;
-    return max_wedge.front().latencyNs/1000000;
+    return max_wedge.front().latencyNs / 1000000;
 
   }
 
@@ -64,11 +66,14 @@ public:
       min_wedge.pop_front();
     }
 
+    history.push_back(time);
+    if (history.size() > 3)history.pop_front();
+
   }
 
 
   bool hasData() {
-    return !min_wedge.empty() && !max_wedge.empty();
+    return !min_wedge.empty() && !max_wedge.empty() && history.size() == 3;
   }
 
   uint64_t minInterval() {
@@ -79,6 +84,10 @@ public:
 
   }
 
+  double getHighPassFilterResult() {
+    if (history.size() != 3) return -1;
+    return abs(history[0] * -0.5 + history[1] - history[2] * 0.5)/1000000.;
+  }
 };
 
 #endif //EXTENSIONS_LATENCYCOLLECTOR_H
