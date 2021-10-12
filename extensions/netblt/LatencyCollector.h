@@ -31,6 +31,8 @@ class LatencyCollector {
   std::deque<LatencyRecord> max_wedge;
   std::deque<LatencyRecord> min_wedge;
   std::deque<uint64_t> history;
+  double highPassFilterResult = -1;
+  int q_d_deny_counter = 0;
 
 public:
   int getMinRTT() {
@@ -66,11 +68,18 @@ public:
       min_wedge.pop_front();
     }
 
+    //high pass filter
     history.push_back(time);
     if (history.size() > 3)history.pop_front();
-
+    highPassFilterResult = getHighPassFilterResult();
+    if (highPassFilterResult > 0.2) q_d_deny_counter = 12;
+    else q_d_deny_counter--;
+    if (q_d_deny_counter < 0) q_d_deny_counter = 0;
   }
 
+  bool shouldIgnoreCongestionSignal() {
+    return q_d_deny_counter >= 3;
+  }
 
   bool hasData() {
     return !min_wedge.empty() && !max_wedge.empty() && history.size() == 3;
@@ -86,7 +95,7 @@ public:
 
   double getHighPassFilterResult() {
     if (history.size() != 3) return -1;
-    return abs(history[0] * -0.5 + history[1] - history[2] * 0.5)/1000000.;
+    return abs(history[0] * -0.5 + history[1] - history[2] * 0.5) / 1000000.;
   }
 };
 

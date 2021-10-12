@@ -84,15 +84,7 @@ private:
   }
 
   static double getBeta(double recv, double send, double tolerance) {
-    if (recv - send >= -tolerance) return 0.7;
-    double ratio = (recv - send) / -tolerance;
-    if (ratio <= 1) {
-      std::cerr << "should not happen!!!!!!!!!!" << ratio << "recv: " <<
-                recv << "send: " << send << "tolerance:" << tolerance << std::endl;
-      return 0.9;
-    }
-    if (ratio >= 2) return 0.6;
-    return (ratio - 2) * (-0.9) + (ratio - 1) * (0.6);
+   return 0.7;
   }
 
   void additiveIncrease() {
@@ -217,8 +209,7 @@ private:
 
     //just got back, either increase or decrease
     if (m_adjustmentState == GOTBACK_STATE) {
-      if (compare(rate, m_burstSz, tolerance)) {
-        m_options.cubicBeta = getBeta(rate, m_burstSz, tolerance);
+      if (compare(rate, m_burstSz, tolerance) && !m_sc.shouldIgnoreCongestionSignal()) {
         cubicDecrease();
         m_adjustmentState = WAIT_STATE;//rate must change once ready
         m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
@@ -240,10 +231,8 @@ private:
     //m_adjustmentState == WAIT_STATE
     //we are waiting for probe to get back
     currentRound++;
-    if (compare(rate, m_last_bs, tolerance)) {
+    if (compare(rate, m_last_bs, tolerance)&& !m_sc.shouldIgnoreCongestionSignal()) {
       //m_adjustmentState = WAIT_STATE;//rate must change once ready
-      m_options.cubicBeta = getBeta(rate, m_last_bs, tolerance);
-
       cubicDecrease();
       m_adjustmentState = WAIT_STATE;//rate must change once ready
       m_lastProbeSegment = m_highRequested + 1;//after change, we need to know when result is ready
